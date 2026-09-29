@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>FR-1 Prototype — Center &amp; Account Setup</title>
+<style>
+  :root{ --ink:#1a1d21; --mut:#6b7280; --line:#e5e7eb; --acc:#2563eb; --bg:#fafafa; --card:#fff; --bad:#dc2626; }
+  *{box-sizing:border-box}
+  body{margin:0;font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:var(--ink);background:var(--bg)}
+  header.top{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;padding:10px 16px;background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+  .brand{font-weight:700;cursor:pointer}
+  .brand small{color:var(--mut);font-weight:400;margin-left:6px}
+  .spacer{flex:1}
+  header.top select{border:1px solid var(--line);background:#fff;border-radius:6px;padding:5px 8px;font-size:13px}
+  main{max-width:980px;margin:0 auto;padding:20px 16px 60px}
+  h1{font-size:22px;margin:0 0 2px} h2{font-size:17px;margin:20px 0 8px}
+  h3{font-size:12px;margin:10px 0 5px;color:var(--mut);text-transform:uppercase;letter-spacing:.5px}
+  .mut{color:var(--mut)} .small{font-size:12.5px;color:var(--mut)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin:10px 0}
+  .grid{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
+  .stat{border:1px solid var(--line);border-radius:10px;padding:12px;background:var(--card)}
+  .stat b{font-size:20px;display:block}
+  .stat span{color:var(--mut);font-size:13px}
+  .empty{border:1px dashed var(--line);border-radius:8px;padding:16px;color:var(--mut);text-align:center;font-size:13px}
+  label{display:block;font-size:12px;color:var(--mut);margin:6px 0 2px}
+  input,select,textarea{width:100%;border:1px solid var(--line);border-radius:6px;padding:6px 9px;font:inherit;background:#fff}
+  .static{width:100%;border:1px solid var(--line);border-radius:6px;padding:6px 9px;font:inherit;background:#f4f4f5;color:var(--ink)}
+  textarea{min-height:80px}
+  button{border-radius:6px;padding:7px 14px;font-size:14px;cursor:pointer;border:1px solid var(--line);background:#fff;color:var(--ink)}
+  button:hover{background:#f3f4f6}
+  .btn{border-color:var(--acc);background:var(--acc);color:#fff}
+  .btn:hover{filter:brightness(1.08)}
+  .danger{color:var(--bad);border-color:var(--line)}
+  .xs{padding:3px 8px;font-size:12px;margin-right:4px}
+  .tabs{display:flex;gap:6px;flex-wrap:wrap;margin:14px 0}
+  .tab{border:1px solid var(--line);background:#fff;border-radius:6px;padding:6px 12px;font-size:13px}
+  .tab.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+  table.tbl{width:100%;border-collapse:collapse;font-size:14px}
+  .tbl td,.tbl th{border-bottom:1px solid var(--line);padding:8px 6px;text-align:left;vertical-align:top}
+  .tbl th{font-size:11.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--mut)}
+  .err{border:1px solid var(--bad);background:#fef2f2;color:var(--bad);border-radius:8px;padding:10px 12px;font-size:13px;margin:10px 0}
+  .hint{font-size:12.5px;color:var(--mut);margin-top:3px}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+  .row>*{flex:1 1 200px;min-width:0}
+  .row>.fit{flex:0 0 auto}
+  .field-grid{display:grid;gap:0 16px;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));align-items:end}
+  .rule-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0}
+  .rule-row input{width:95px}
+  .rule-row .lbl{font-size:13px;color:var(--mut)}
+  .tag{font-size:11px;border:1px solid var(--line);border-radius:99px;padding:1px 8px;color:var(--mut);white-space:nowrap}
+  .step-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--acc);margin-right:6px}
+  details summary{cursor:pointer;color:var(--mut);font-size:14px}
+  details ul{margin:10px 0 4px;padding-left:20px}
+  details li{margin:6px 0}
+  @media(max-width:640px){ .grid{grid-template-columns:1fr} }
+</style>
+</head>
+<body>
+<div id="top"></div>
+<main id="app"></main>
+
+<script>
+'use strict';
+/* ============================================================
+   FR-1 prototype — Center & Account Setup
+   Scope (PRD): FR-1.1 center registration + branches,
+   FR-1.2 teacher invites, FR-1.3 customer + student profiles.
+   AC: each role's home shows only data relevant to that role.
+   Everything else (FR-2..FR-8) is an explicit placeholder.
+   ============================================================ */
+
+// ---------- state ----------
+const LS_KEY = 'fr1-prototype-v1';
+let S = load() || freshState();
+let WIZ = null; // setup wizard temp state (not persisted until finished)
+
+function freshState(){
+  return { seq:0, center:null, branches:[], users:[], invites:[], students:[],
+           currentUserId:null, view:'chooser', adminTab:'overview', notes:'', wizError:null };
+}
+function load(){ try{ const r=localStorage.getItem(LS_KEY); if(r) return JSON.parse(r); }catch(e){} return null; }
+function save(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(S)); }catch(e){} }
+function newId(){ S.seq += 1; return S.seq; }
+
+// ---------- helpers ----------
+function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function currentUser(){ return S.users.find(u => u.id === S.currentUserId) || null; }
+function tzLabel(t){ return ({WIB:'WIB (UTC+7)', WITA:'WITA (UTC+8)', WIT:'WIT (UTC+9)'})[t] || t; }
+function ageFrom(birth){
+  if(!birth) return null;
+  const b = new Date(birth + 'T00:00:00'), n = new Date();
+  let a = n.getFullYear() - b.getFullYear();
+  const m = n.getMonth() - b.getMonth();
+  if(m < 0 || (m === 0 && n.getDate() < b.getDate())) a--;
+  return a;
+}
+function slug(s){ return s.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,''); }
+
+// ---------- routing ----------
+function render(){
+  const top = document.getElementById('top'), app = document.getElementById('app');
+  let html = '';
+  if(!S.center){
+    top.innerHTML = `<header class="top"><span class="brand">⛳ BookClass <small>FR-1 prototype · first-run setup</small></span><span class="spacer"></span><button class="danger" onclick="resetAll()">Reset</button></header>`;
+    html = renderWizard();
+  } else {
+    const me = currentUser();
+    top.innerHTML = renderTopbar(me);
+    if(!me || S.view === 'chooser') html = renderChooser();
+    else if(me.role === 'admin') html = renderAdmin(me);
+    else if(me.role === 'teacher') html = renderTeacherHome(me);
+    else html = renderCustomerHome(me);
+  }
+  html += renderNotesSection();
+  app.innerHTML = html;
+  save();
+}
+function renderTopbar(me){
+  const opts = S.users.map(u =>
+    `<option value="${u.id}" ${me && me.id===u.id ? 'selected' : ''}>[${u.role}] ${esc(u.name)}</option>`).join('');
+  return `<header class="top">
+    <span class="brand" onclick="goHome()">⛳ ${esc(S.center.name)} <small>FR-1 prototype</small></span>
+    <span class="spacer"></span>
+    <select onchange="switchRole(this.value)">
+      <option value="">↻ switch role…</option>${opts}
+    </select>
+    <button class="danger" onclick="resetAll()">Reset</button>
+  </header>`;
+}
+function goHome(){ S.currentUserId = null; S.view = 'chooser'; render(); }
+function switchRole(id){ S.currentUserId = id ? parseInt(id,10) : null; S.view = 'home'; render(); }
+function resetAll(){ localStorage.removeItem(LS_KEY); location.reload(); }
+
+// ============================================================
+// SETUP WIZARD (FR-1.1) — no super admin: first user claims the instance
+// ============================================================
+function renderWizard(){
+  if(!WIZ || WIZ.step === 'intro'){
+    return `<h1>Welcome 👋</h1>
+    <p>This deployment is <b>fresh — no center registered yet</b>.
+       In v1 there is no super admin: the first user to open a fresh deployment
+       registers the center (single-instance deploy, PRD SC-2).</p>
+    <div class="card"><h2>What you'll set up (FR-1.1)</h2>
+      <ul>
+        <li>Center: name, currency, default cancellation policy</li>
+        <li>One or more branches (name, address, timezone — WIB/WITA/WIT)</li>
+        <li>Your admin account (name + email — passwords come in Milestone 1)</li>
+      </ul>
+      <p><button class="btn" onclick="startWizard()">Start setup</button>
+      <button class="ghost" onclick="seedDemo()">Load demo data instead</button></p>
+    </div>`;
+  }
+  if(WIZ.step === 'center') return wizardCenterStep();
+  return wizardBranchStep();
+}
+function startWizard(){
+  WIZ = { step:'center',
+          centerName:'', currency:'IDR', refundDestination:'gateway_then_credit',
+          adminName:'', adminEmail:'',
+          policyName:'Default policy',
+          policyRules:[ {hours:24,percent:100}, {hours:2,percent:50}, {hours:0,percent:0} ],
+          branches:[ {name:'', address:'', tz:'WIB'} ] };
+  S.wizError = null;
+  render();
+}
+function wizStep(s){ WIZ.step = s; S.wizError = null; render(); }
+
+function wizardCenterStep(){
+  const p = WIZ.policyRules;
+  return `<h1>Register your center <span class="mut small">step 1/2</span></h1>
+  ${S.wizError ? `<div class="err">${esc(S.wizError)}</div>` : ''}
+  <div class="card"><h3>Center</h3>
+    <div class="row">
+      <div><label>Center name</label>
+        <input value="${esc(WIZ.centerName)}" placeholder="e.g. Lingkar Belajar" oninput="WIZ.centerName=this.value"></div>
+      <div class="fit" style="width:230px"><label>Currency</label>
+        <div class="static">IDR — Indonesian Rupiah</div></div>
+    </div>
+    <div class="hint">Only one currency per deployment (PRD §6) — text, not a choice, until that changes.</div>
+  </div>
+  <div class="card"><h3>Your admin account</h3>
+    <div class="field-grid">
+      <div><label>Name</label><input value="${esc(WIZ.adminName)}" placeholder="e.g. Budi Santoso" oninput="WIZ.adminName=this.value"></div>
+      <div><label>Email</label><input value="${esc(WIZ.adminEmail)}" type="email" placeholder="admin@center.id" oninput="WIZ.adminEmail=this.value"></div>
+    </div>
+    <div class="hint">Password skipped in this prototype — real auth is Milestone 1.</div>
+  </div>
+  <div class="card"><h3>Default cancellation policy</h3>
+  ${policyEditorHtml('wiz')}
+  <div class="hint">Rule with the largest “hours before” cutoff ≤ time-remaining wins; the lowest cutoff is the
+  no-show/floor case (BR-6 → usually 0%). Per-class overrides come in FR-2/FR-6.</div>
+  </div>
+  <div class="card"><h3>Refund destination <span class="tag">FR-6, placeholder here</span></h3>
+    <p class="small">Center-level config (FR-6.3). Included in setup to feel whether it belongs there or in settings.</p>
+    <label><input type="radio" name="refund" value="gateway_then_credit" ${WIZ.refundDestination==='gateway_then_credit'?'checked':''} onchange="WIZ.refundDestination=this.value">
+      Back to original payment (Midtrans refund API), store credit as fallback</label>
+    <label><input type="radio" name="refund" value="credit_only" ${WIZ.refundDestination==='credit_only'?'checked':''} onchange="WIZ.refundDestination=this.value">
+      Store credit only (simplest v1)</label>
+  </div>
+  <p><button class="btn" onclick="wizStep('branch')">Continue → branches</button></p>`;
+}
+
+function wizardBranchStep(){
+  const rows = WIZ.branches.map((b,i)=>`
+    <div class="card">
+      <div class="row">
+        <div><label>Branch name</label><input value="${esc(b.name)}" placeholder="e.g. Kemang" oninput="wizBranch(${i},'name',this.value)"></div>
+        <div><label>Address</label><input value="${esc(b.address)}" placeholder="Jl. …" oninput="wizBranch(${i},'address',this.value)"></div>
+        <div class="fit" style="width:190px"><label>Timezone</label>
+          <select onchange="wizBranch(${i},'tz',this.value)">
+            ${['WIB','WITA','WIT'].map(t=>`<option value="${t}" ${b.tz===t?'selected':''}>${tzLabel(t)}</option>`).join('')}
+          </select></div>
+      </div>
+      <p style="margin:10px 0 0"><button class="danger xs" onclick="wizRemoveBranch(${i})">Remove this branch</button></p>
+    </div>`).join('');
+  return `<h1>Branches <span class="mut small">step 2/2</span></h1>
+  <p class="mut">Classes belong to a branch; teachers, customers, and students are center-wide (PRD §10.5).</p>
+  ${S.wizError ? `<div class="err">${esc(S.wizError)}</div>` : ''}
+  ${rows}
+  <p><button class="ghost" onclick="wizAddBranch()">+ Add another branch</button></p>
+  <p><button class="ghost" onclick="wizStep('center')">← Back</button>
+     <button class="btn" onclick="finishSetup()">Finish — create center</button></p>`;
+}
+function wizBranch(i,k,v){ WIZ.branches[i][k] = v; }
+function wizAddBranch(){ WIZ.branches.push({name:'',address:'',tz:'WIB'}); S.wizError=null; render(); }
+function wizRemoveBranch(i){
+  if(WIZ.branches.length <= 1){ alert('Keep at least one branch.'); return; }
+  WIZ.branches.splice(i,1); render();
+}
+
+function finishSetup(){
+  const e = [];
+  if(!WIZ.centerName.trim()) e.push('Center name is required.');
+  if(!WIZ.adminName.trim() || !/^\S+@\S+\.\S+$/.test(WIZ.adminEmail)) e.push('Admin name and a valid email are required.');
+  const hrs = WIZ.policyRules.map(r=>r.hours);
+  if(new Set(hrs).size !== hrs.length) e.push('Cancellation policy: cutoff hours must be unique (schema: UNIQUE hours_before).');
+  if(WIZ.policyRules.some(r => !Number.isInteger(r.hours) || r.hours < 0 || !Number.isInteger(r.percent) || r.percent < 0 || r.percent > 100))
+    e.push('Cancellation policy: hours before must be ≥ 0, refund % between 0–100.');
+  if(WIZ.branches.length === 0 || WIZ.branches.some(b => !b.name.trim())) e.push('At least one branch with a name is required.');
+  if(e.length){ S.wizError = e.join(' '); render(); return; }
+
+  const admin = { id:newId(), name:WIZ.adminName.trim(), email:WIZ.adminEmail.trim(), phone:'', role:'admin', status:'active' };
+  S.center = { name:WIZ.centerName.trim(), currency:'IDR',
+               refundDestination:WIZ.refundDestination,
+               policy:{ name:WIZ.policyName, rules:WIZ.policyRules.map(r=>({hours:r.hours,percent:r.percent})) } };
+  S.branches = WIZ.branches.map(b => ({ id:newId(), name:b.name.trim(), address:b.address.trim(), tz:b.tz }));
+  S.users = [admin];
+  S.currentUserId = admin.id;
+  WIZ = null; S.view = 'home'; S.adminTab = 'overview'; S.wizError = null;
+  render();
+}
+
+// shared cancellation-policy editor (wizard + settings)
+function policyRulesTarget(field){ return field === 'settings' ? S.center.policy.rules : WIZ.policyRules; }
+function policyEditorHtml(field){
+  const rules = policyRulesTarget(field);
+  return `<div class="rules">
+    ${rules.map((r,i)=>`
+      <div class="rule-row">
+        <span class="lbl">≥</span>
+        <input type="number" min="0" value="${r.hours}" title="hours before session start"
+               oninput="editRule('${field}',${i},'hours',this.value)">
+        <span class="lbl">hours before →</span>
+        <input type="number" min="0" max="100" value="${r.percent}" title="refund percent"
+               oninput="editRule('${field}',${i},'percent',this.value)">
+        <span class="lbl">% refund</span>
+        <button class="xs danger" onclick="removeRule('${field}',${i})">×</button>
+      </div>`).join('')}
+    <p style="margin:8px 0 0"><button class="xs" onclick="addRule('${field}')">+ add cutoff</button></p>
+  </div>`;
+}
+function editRule(field,i,key,val){
+  const n = parseInt(val,10);
+  if(Number.isNaN(n)) return;
+  const r = policyRulesTarget(field)[i];
+  r[key] = key==='percent' ? Math.min(100, Math.max(0,n)) : Math.max(0,n);
+}
+function addRule(field){ policyRulesTarget(field).push({hours:0,percent:0}); render(); }
+function removeRule(field,i){
+  const rules = policyRulesTarget(field);
+  if(rules.length <= 1){ alert('A policy needs at least one rule.'); return; }
+  rules.splice(i,1); render();
+}
+
+// ============================================================
+// ROLE CHOOSER — this is the switchboard to *feel* the FR-1 AC
+// (each role's home shows only its own data)
+// ============================================================
+function renderChooser(){
+  const by = r => S.users.filter(u => u.role === r);
+  return `<h1>Continue as…</h1>
+  <p class="mut">FR-1 acceptance criterion: <b>each role's home screen shows only data relevant to that role</b>.
+  Switch freely — the header dropdown does the same without reloading.</p>
+  <div class="grid">
+    ${roleCard('admin','🏢 Center admin', by('admin'), 'Manage center, branches, teachers — organization-wide.')}
+    ${roleCard('teacher','🧑‍🏫 Teacher', by('teacher'), 'Sees only own schedule, rosters, session notes.')}
+    ${roleCard('customer','👨‍👩‍👧 Parent / student', by('customer'), 'Owns student profiles; books & pays for them.')}
+  </div>
+  <div class="card"><h3>Demo controls</h3>
+    <button class="ghost" onclick="seedDemo()">Load demo data (skip setup)</button>
+    <button class="danger" onclick="resetAll()">Reset everything</button>
+  </div>`;
+}
+function roleCard(key,title,users,desc){
+  const opts = users.length
+    ? users.map(u=>`<option value="${u.id}">${esc(u.name)}</option>`).join('')
+    : '<option value="">— none yet —</option>';
+  const extra = key==='customer'
+    ? `<p style="margin:10px 0 0"><button class="btn" onclick="S.view='customer-register';render()">Register new account</button></p>`
+    : '';
+  const noneHint = !users.length
+    ? `<div class="small" style="margin-top:6px">${key==='teacher' ? 'No teachers yet — invite one from the admin → Teachers tab.' : key==='admin' ? 'No admin user.' : 'No customers yet.'}</div>`
+    : '';
+  return `<div class="card"><h3>${title}</h3>
+    <p class="small">${desc}</p>
+    <div class="row" style="margin-top:8px">
+      <select id="sel-${key}">${opts}</select>
+      <div class="fit"><button class="btn" onclick="continueAs('${key}')">Continue</button></div>
+    </div>${noneHint}${extra}</div>`;
+}
+function continueAs(key){
+  const sel = document.getElementById('sel-' + key);
+  if(!sel.value){
+    alert(key === 'teacher'
+      ? 'No teacher account yet — invite one from admin → Teachers tab.'
+      : key === 'admin' ? 'No admin user in this state.' : 'Register a customer account below.');
+    return;
+  }
+  switchRole(sel.value);
+}
+
+// ============================================================
+// ADMIN HOME (FR-1.1 + FR-1.2 admin side) — desktop-first
+// ============================================================
+function renderAdmin(me){
+  const tabs = [['overview','Overview'],['branches','Branches'],['staff','Teachers & admins'],['settings','Center settings']];
+  const links = tabs.map(([k,l]) =>
+    `<button class="tab ${S.adminTab===k?'on':''}" onclick="S.adminTab='${k}';render()">${l}</button>`).join('');
+  let body = '';
+  if(S.adminTab === 'overview') body = adminOverview();
+  if(S.adminTab === 'branches') body = adminBranches();
+  if(S.adminTab === 'staff')    body = adminStaff();
+  if(S.adminTab === 'settings') body = adminSettings();
+  return `<h1>${esc(S.center.name)}</h1>
+  <p class="mut">Signed in as ${esc(me.name)} · Admin — organization-wide view (all branches)</p>
+  <div class="tabs">${links}</div>${body}`;
+}
+
+function adminOverview(){
+  const teachers = S.users.filter(u=>u.role==='teacher');
+  const pending = S.invites.filter(i=>i.status==='pending' && i.role==='teacher');
+  const customers = S.users.filter(u=>u.role==='customer');
+  return `<div class="grid">
+    <div class="stat"><b>${S.branches.length}</b><span>Branches</span></div>
+    <div class="stat"><b>${teachers.length} <span class="small">+${pending.length} invited</span></b><span>Teachers</span></div>
+    <div class="stat"><b>${customers.length}</b><span>Customer accounts</span></div>
+    <div class="stat"><b>${S.students.length}</b><span>Student profiles</span></div>
+  </div>
+  <div class="card"><h3>Planned in later prototypes (not in FR-1)</h3>
+    <ul class="small">
+      <li>FR-2 Classes &amp; sessions (schedule rules, teacher assignment, conflicts)</li>
+      <li>FR-3 Pricing rules &amp; package prices</li>
+      <li>FR-4 Bookings (per-session &amp; series), seat counting</li>
+      <li>FR-5 Payments — Midtrans QRIS sandbox</li>
+      <li>FR-6 Cancellation, refunds, store credit</li>
+      <li>FR-7 Attendance &amp; session notes (teacher side)</li>
+      <li>FR-8 Earned-revenue report &amp; refund exposure</li>
+    </ul>
+  </div>`;
+}
+
+function adminBranches(){
+  const rows = S.branches.map(b => `
+    <tr><td><b>${esc(b.name)}</b>${b.address ? `<div class="small">${esc(b.address)}</div>` : ''}</td>
+      <td>${tzLabel(b.tz)}</td>
+      <td><button class="xs danger" onclick="deleteBranch(${b.id})">Delete</button></td></tr>`).join('');
+  return `<div class="card"><h3>Add branch</h3>
+    <div class="row">
+      <div><input id="brName" placeholder="Branch name — e.g. BSD"></div>
+      <div><input id="brAddress" placeholder="Address"></div>
+      <div class="fit" style="width:180px"><select id="brTz">
+        <option value="WIB">WIB</option><option value="WITA">WITA</option><option value="WIT">WIT</option>
+      </select></div>
+      <div class="fit"><button class="btn" onclick="addBranch()">Add branch</button></div>
+    </div></div>
+  <div class="card"><h3>Branches (${S.branches.length})</h3>
+    <table class="tbl"><tr><th>Branch</th><th>Timezone</th><th></th></tr>${rows}</table>
+    <p class="small" style="margin-bottom:0">Sessions render in the branch's timezone (FR-2+). Deleting is destructive in the real schema — confirm before wiring it.</p>
+  </div>`;
+}
+function addBranch(){
+  const n = document.getElementById('brName').value.trim();
+  if(!n){ alert('Branch name is required.'); return; }
+  S.branches.push({ id:newId(), name:n, address:document.getElementById('brAddress').value.trim(),
+                    tz:document.getElementById('brTz').value });
+  render();
+}
+function deleteBranch(id){
+  if(S.branches.length <= 1){ alert('Keep at least one branch (schema: classes must belong to a branch).'); return; }
+  if(!confirm('Delete this branch? In the real app, classes/bookings on it would need handling (FR-2.2).')) return;
+  S.branches = S.branches.filter(b => b.id !== id);
+  render();
+}
+
+function adminStaff(){
+  const invites = S.invites.map(i => `
+    <tr><td>${esc(i.name)}</td><td>${esc(i.email)}</td>
+      <td>${i.role === 'admin' ? 'Co-admin' : 'Teacher'}</td>
+      <td><span class="tag">${i.status === 'pending' ? '⏳ pending invite' : '✓ accepted'}</span></td>
+      <td>${i.status === 'pending' ? `
+        <button class="xs" onclick="copyInvite(${i.id})">Copy link</button>
+        <button class="xs" onclick="acceptInvite(${i.id})">Accept (demo)</button>
+        <button class="xs danger" onclick="revokeInvite(${i.id})">Revoke</button>` : `<span class="small">${esc(S.users.find(u=>u.email===i.email)?.name || '')}</span>`}
+      </td></tr>`).join('');
+  const userRows = S.users.filter(u=>u.role!=='customer').map(u => `
+    <tr><td>${esc(u.name)}</td><td>${esc(u.email)}</td>
+      <td>${u.role === 'admin' ? 'Admin' : 'Teacher'}</td><td><span class="tag">${u.status}</span></td></tr>`).join('');
+  return `<div class="card"><h3>Invite to this center</h3>
+    <div class="row">
+      <div><input id="inName" placeholder="Full name — e.g. Rina Kusuma"></div>
+      <div><input id="inEmail" placeholder="Email — e.g. rina@gmail.com"></div>
+      <div class="fit" style="width:150px"><select id="inRole">
+        <option value="teacher">Teacher</option>
+        <option value="admin">Co-admin</option>
+      </select></div>
+      <div class="fit"><button class="btn" onclick="addInvite()">Send invite</button></div>
+    </div>
+    <div class="hint">FR-1.2: teacher accepts via emailed link, then logs in and sees only own schedule/rosters/notes.
+    "Accept (demo)" simulates clicking the link — real password set happens in Milestone 1.
+    Co-admin invites answer question-1.md ("more than 1 admin?"): schema supports it via role, UI here is minimal.</div>
+  </div>
+  <div class="card"><h3>Pending invites</h3>
+    ${invites ? `<table class="tbl"><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th></th></tr>${invites}</table>` : '<div class="empty">No invites yet.</div>'}
+  </div>
+  <div class="card"><h3>Staff on this center</h3>
+    <table class="tbl"><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th></tr>${userRows}</table>
+  </div>`;
+}
+function addInvite(){
+  const n = document.getElementById('inName').value.trim();
+  const e = document.getElementById('inEmail').value.trim();
+  const role = document.getElementById('inRole').value;
+  if(!n || !/^\S+@\S+\.\S+$/.test(e)){ alert('Name and a valid email are required.'); return; }
+  if(S.users.some(u=>u.email===e) || S.invites.some(i=>i.email===e)){ alert('A user with this email already exists.'); return; }
+  S.invites.push({ id:newId(), name:n, email:e, role, token:'INV-' + Math.random().toString(36).slice(2,8).toUpperCase(), status:'pending' });
+  render();
+}
+function copyInvite(id){
+  const i = S.invites.find(x=>x.id===id);
+  const url = `https://${slug(S.center.name)}.app/invite/${i.token}`;
+  if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url);
+  alert('Invite link (copied to clipboard):\n' + url);
+}
+function acceptInvite(id){
+  const i = S.invites.find(x=>x.id===id);
+  const u = { id:newId(), name:i.name, email:i.email, phone:'', role:i.role, status:'active' };
+  S.users.push(u);
+  i.status = 'accepted';
+  alert(`${i.name} accepted the invite → active ${i.role === 'admin' ? 'co-admin' : 'teacher'} account. (Real flow: emailed link → set password, Milestone 1.)`);
+  render();
+}
+function revokeInvite(id){
+  if(!confirm('Revoke this invite? The link stops working.')) return;
+  S.invites = S.invites.filter(x=>x.id!==id);
+  render();
+}
+
+function adminSettings(){
+  return `<div class="card"><h3>Center</h3>
+    <div class="row">
+      <div><label>Center name</label>
+        <input value="${esc(S.center.name)}" oninput="S.center.name=this.value;save()"></div>
+      <div class="fit" style="width:230px"><label>Currency</label>
+        <div class="static">IDR — Indonesian Rupiah</div></div>
+    </div>
+    <div class="hint">One currency per deployment (PRD §6) — a DB config value, not a UI field.</div>
+  </div>
+  <div class="card"><h3>Default cancellation policy <span class="tag">FR-6 config, editable now</span></h3>
+    ${policyEditorHtml('settings')}
+    <div class="hint">Global default; per-class override comes in FR-2.</div>
+  </div>
+  <div class="card"><h3>Refund destination <span class="tag">FR-6</span></h3>
+    <label><input type="radio" name="rd" value="gateway_then_credit" ${S.center.refundDestination==='gateway_then_credit'?'checked':''} onchange="setRefund(this.value)">
+      Back to original payment first, store credit fallback</label>
+    <label><input type="radio" name="rd" value="credit_only" ${S.center.refundDestination==='credit_only'?'checked':''} onchange="setRefund(this.value)">
+      Store credit only</label>
+  </div>
+  <div class="card"><h3>Midtrans gateway <span class="tag">M0 spike</span></h3>
+    <p class="small">Sandbox/live keys, merchant id live here in Milestone 0. Not part of FR-1 — showing the slot so setup feels complete.</p>
+    <button class="xs" disabled>Configure gateway (Milestone 0)</button>
+  </div>`;
+}
+function setRefund(v){ S.center.refundDestination = v; render(); }
+
+// ============================================================
+// TEACHER HOME (FR-1.2) — only own schedule/rosters/notes
+// ============================================================
+function renderTeacherHome(me){
+  return `<h1>${esc(me.name)}</h1>
+  <p class="mut">Teacher · ${esc(S.center.name)}</p>
+  <div class="card">
+    <b>What you can see here: only your own data.</b>
+    <p class="small" style="margin:4px 0 0">No branches, no other teachers, no customer accounts, no money — required by the FR-1 acceptance criterion.</p>
+  </div>
+  <h3>My schedule</h3>
+  <div class="empty">Nothing scheduled yet.<br><span class="small">Sessions land here once the admin creates classes and assigns you (FR-2).</span></div>
+  <h3>My rosters — attendance</h3>
+  <div class="empty">Rosters open at each session start and close 24h after it ends (FR-7).</div>
+  <h3>My session notes</h3>
+  <div class="empty">Notes you write per session are listed here (FR-7) — visible to admin and the booking customers.</div>`;
+}
+
+// ============================================================
+// CUSTOMER (FR-1.3) — register, profiles, (bookings later)
+// ============================================================
+function renderCustomerRegister(){
+  return `<h1>Parent / adult student account</h1>
+  <div class="card"><h3>Register</h3>
+    <p class="small">One account, one or more <b>student profiles</b> — you always book <i>for a profile</i>, never for yourself (PRD §2).</p>
+    <div class="field-grid">
+      <div><label>Name</label><input id="cuName" placeholder="e.g. ibu Andini"></div>
+      <div><label>Email</label><input id="cuEmail" type="email" placeholder="andini@gmail.com"></div>
+    </div>
+    <label>Phone (optional)</label><input id="cuPhone" placeholder="0812-xxxx-xxxx">
+    <div class="hint">Phone optional in FR-1; likely wanted later for payment receipts (FR-9/WhatsApp post-MVP).</div>
+    <p style="margin:14px 0 0"><button class="btn" onclick="registerCustomer()">Create account</button></p>
+  </div>`;
+}
+function registerCustomer(){
+  const n = document.getElementById('cuName').value.trim();
+  const e = document.getElementById('cuEmail').value.trim();
+  if(!n || !/^\S+@\S+\.\S+$/.test(e)){ alert('Name and a valid email are required.'); return; }
+  if(S.users.some(u=>u.email===e)){ alert('This email already has an account — use the role switcher.'); return; }
+  const u = { id:newId(), name:n, email:e, phone:document.getElementById('cuPhone').value.trim(), role:'customer', status:'active' };
+  S.users.push(u);
+  S.currentUserId = u.id; S.view = 'home';
+  render();
+}
+function renderCustomerHome(me){
+  const mine = S.students.filter(p => p.ownerId === me.id);
+  const rows = mine.map(p => `
+    <tr><td><b>${esc(p.name)}</b>${p.notes ? `<div class="small">${esc(p.notes)}</div>` : ''}</td>
+      <td>${p.birthDate ? ageFrom(p.birthDate) + ' yrs' : '—'}</td>
+      <td><div class="small">${esc(p.birthDate || 'no birth date')}</div></td>
+      <td><button class="xs danger" onclick="deleteProfile(${p.id})">Remove</button></td></tr>`).join('');
+  return `<h1>${esc(me.name)}</h1>
+  <p class="mut">Parent / student · ${esc(S.center.name)} · ${esc(me.email)}${me.phone ? ' · ' + esc(me.phone) : ''}</p>
+  <div class="grid" style="grid-template-columns:1fr 1fr;align-items:start">
+    <div>
+      <div class="card"><h3>My student profiles (${mine.length})</h3>
+        ${mine.length ? `<table class="tbl"><tr><th>Name</th><th>Age</th><th>Birth date</th><th></th></tr>${rows}</table>` : '<div class="empty">No profiles yet — add the first one.</div>'}
+        <div style="border-top:1px solid var(--line);margin-top:12px;padding-top:10px">
+          <div class="field-grid">
+            <div><label>Name</label><input id="pName" placeholder="e.g. Keisha"></div>
+            <div><label>Birth date</label><input id="pBirth" type="date"></div>
+          </div>
+          <label>Notes (optional)</label><input id="pNotes" placeholder="grade, allergy, anything useful">
+          <p style="margin:8px 0 0"><button class="btn" onclick="addProfile()">Add profile</button></p>
+        </div>
+      </div>
+      <div class="card"><h3>Upcoming bookings</h3>
+        <div class="empty">Nothing booked yet.<br><span class="small">Browsing &amp; booking arrive with FR-2/FR-4 (per-session or full series, pay by QRIS).</span></div>
+      </div>
+      <div class="card"><h3>Payments &amp; refunds</h3>
+        <div class="empty">Nothing yet.<br><span class="small">Payment status, refund status per booking — FR-5/FR-6.</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>What you can't see <span class="tag">role isolation ✓</span></h3>
+      <ul class="small">
+        <li>Admin/center configuration, branches, pricing, policies</li>
+        <li>Teachers, rosters, attendance, notes</li>
+        <li>Other customers / student profiles</li>
+      </ul>
+      <label>Browse classes</label>
+      <button disabled>Browse classes — FR-4, next prototype</button>
+    </div>
+  </div>`;
+}
+function addProfile(){
+  const n = document.getElementById('pName').value.trim();
+  if(!n){ alert('Profile name is required.'); return; }
+  S.students.push({ id:newId(), ownerId:S.currentUserId, name:n,
+                    birthDate:document.getElementById('pBirth').value || null,
+                    notes:document.getElementById('pNotes').value.trim() });
+  render();
+}
+function deleteProfile(id){
+  if(!confirm('Remove this profile? In the real app, past bookings stay; future bookings need re-booking.')) return;
+  S.students = S.students.filter(p => p.id !== id);
+  render();
+}
+
+// ============================================================
+// DEMO SEED — jump straight into a fully set-up center
+// ============================================================
+function seedDemo(){
+  S = freshState();
+  S.center = { name:'Lingkar Belajar', currency:'IDR', refundDestination:'gateway_then_credit',
+               policy:{ name:'Default policy', rules:[{hours:24,percent:100},{hours:2,percent:50},{hours:0,percent:0}] } };
+  S.branches = [
+    { id:newId(), name:'Kemang', address:'Jl. Kemang Raya 12, Jakarta Selatan', tz:'WIB' },
+    { id:newId(), name:'BSD', address:'Ruko BSD Green Office Park, Tangerang', tz:'WIB' },
+  ];
+  S.users = [
+    { id:newId(), name:'Budi Santoso', email:'admin@lingkarbelajar.id', phone:'', role:'admin', status:'active' },
+    { id:newId(), name:'Sari Wulandari', email:'sari@lingkarbelajar.id', phone:'', role:'teacher', status:'active' },
+    { id:newId(), name:'Andi Pratama', email:'andi@gmail.com', phone:'0812-3456-7890', role:'customer', status:'active' },
+  ];
+  S.invites = [
+    { id:newId(), name:'Rina Kusuma', email:'rina@lingkarbelajar.id', role:'teacher', token:'INV-R7K2M9', status:'pending' },
+  ];
+  S.students = [
+    { id:newId(), ownerId:S.users[2].id, name:'Keisha Pratama', birthDate:'2017-03-14', notes:'Grade 3, loves drawing' },
+    { id:newId(), ownerId:S.users[2].id, name:'Raka Pratama', birthDate:'2019-08-02', notes:'' },
+  ];
+  S.currentUserId = S.users[0].id; S.view = 'home'; S.adminTab = 'overview';
+  render();
+}
+
+// ============================================================
+// WALKTHROUGH NOTES — capture what's missing / not needed
+// ============================================================
+function renderNotesSection(){
+  return `<section class="card" id="proto-notes">
+    <h2>Prototype notes — for the FR-1 review</h2>
+    <p class="small">Scribble while clicking through. Saved in this browser (localStorage).</p>
+    <textarea id="noteBox" placeholder="e.g. 'invite flow feels heavy — maybe admin just adds a teacher directly in v1?'">${esc(S.notes)}</textarea>
+    <details>
+      <summary>Open questions this prototype surfaced (${OPEN_QUESTIONS.length})</summary>
+      <ul>
+        ${OPEN_QUESTIONS.map(q => `<li><span class="tag">${q.tag}</span> <b>${q.q}</b> — ${q.note}</li>`).join('')}
+      </ul>
+    </details>
+  </section>`;
+}
+function saveNotes(v){ S.notes = v; save(); }
+
+const OPEN_QUESTIONS = [
+  { tag:'decision', q:'Who owns registration?', note:'No super admin: first user on a fresh deployment registers the center (matches single-instance deploy). Co-admins supported via staff tab (answers question-1.md). Keep co-admin invites in v1?' },
+  { tag:'probably not needed', q:'Currency as a setup field', note:'Contradicts "single currency per deployment" (PRD §6) — prototype locks it to IDR. Keep as a config value, drop from the wizard.' },
+  { tag:'recommend', q:'Student "age" (FR-1.3) vs birth date (schema)', note:'Prototype uses birth date + derived age. Birth dates don\'t go stale; parents know them. The free-text "notes" field on profiles is in the schema — is it needed in v1?' },
+  { tag:'probably not needed', q:'Invite expiry / resend', note:'v1 centers have a handful of teachers: revoke + copy link may be enough. No expiry implemented on purpose.' },
+  { tag:'minor', q:'Phone numbers', note:'Optional phone collected for customers only (receipts, future WhatsApp). Teachers/admins: none in FR-1. Confirm.' },
+  { tag:'out of scope', q:'Teacher who is also a parent', note:'Schema is single-role; a teacher-parent would need a second account. Demo role-switcher hides this — fine for v1, document it.' },
+  { tag:'decision', q:'UI language', note:'PRD assumes Bahasa Indonesia (unconfirmed §10.2). Prototype is English on purpose; the policy wording ("≥24h before → 100%") should be sanity-checked in Indonesian.' },
+  { tag:'decision', q:'Refund destination placement', note:'Center-level config (FR-6.3) — prototype puts it in setup + settings. Feels like it belongs with setup; decide.' },
+  { tag:'noted', q:'Auth entirely simulated', note:'No passwords anywhere: wizard asks admin name/email, teacher "accept" is a button. Real auth is Milestone 1 — don\'t judge flows by this.' },
+  { tag:'noted', q:'Empty states ARE the scope', note:'Teacher/customer homes are mostly empty placeholders — that\'s the honest FR-1 picture and validates the role-isolation AC early.' },
+];
+
+render();
+</script>
+</body>
+</html>
