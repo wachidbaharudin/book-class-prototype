@@ -187,7 +187,7 @@ Evaluation: `rule with max(hours_before) where hours_before <= hours_until_start
 | id | BIGSERIAL PK | |
 | center_id, booking_id, session_id | FK | UNIQUE (booking_id, session_id) |
 | status | ENUM('pending_payment','confirmed','cancelled','completed','no_show') DEFAULT 'pending_payment' | see state machine §4 |
-| unit_price | BIGINT NOT NULL | **snapshot**: resolved price for single-session bookings; `package_price ÷ item_count` for series (remainder → last item) |
+| unit_price | BIGINT NOT NULL | **snapshot**: resolved price for single-session bookings; `package_price` split across items for series via `allocate()` (remainder distributed to earliest items — Dinero.js convention) |
 | cancelled_at | TIMESTAMPTZ NULL | |
 | cancel_reason | TEXT NULL | expired / customer / rescheduled / admin |
 

@@ -1,7 +1,7 @@
 # PRD — Class Booking App for Learning Centers
 
-**Status:** Draft v1 (refined) — 3 open decisions remain (see §10)
-**Goal:** Ready-to-deploy booking app with tightly scoped functionality, used as a showcase to attract development clients.
+**Status:** Draft v1 (refined) — 4 open decisions remain (see §10)
+**Goal:** Ready-to-deploy booking app with tightly scoped functionality, deployable by any learning center with configuration only — no code changes.
 
 ---
 
@@ -12,7 +12,7 @@ A learning center (tutoring, courses, workshops) can publish bookable classes wi
 **Success criteria (what "done" means):**
 1. A complete money-and-booking loop runnable end-to-end in one 10-minute demo (see §8).
 2. Deployable as a single instance for one learning center, using a real payment gateway in **sandbox mode** that can switch to live keys by config change only.
-3. Every business rule (pricing overrides, cancellation, refund handling) is *configurable by the admin*, not hardcoded — this is the core selling point of the showcase.
+3. Every business rule (pricing overrides, cancellation, refund handling) is *configurable by the admin*, not hardcoded — configurability is the product's core differentiator.
 4. Customer-facing flows are mobile-first (parents book from phones); admin/teacher flows are desktop-first.
 
 ---
@@ -139,7 +139,7 @@ Center = one organization, one or more Branches (multi-tenant-ready schema)
 
 "Admin gets money after class passes" is soft, so v1 does **not** gate money. QRIS settles to the center's bank T+1 regardless; there is no withdrawal ceremony. The requirement is satisfied as **reporting** (FR-8): revenue is recognized only when a session ends, and the dashboard shows earned revenue + refund exposure — which is what center owners actually ask for ("how much have I truly earned, and how much could still be refunded").
 
-The ledger schema stays mode-agnostic so a future **platform escrow** model (your merchant account + Midtrans Iris disbursements) remains a config + integration, not a rewrite — relevant only if multi-center SaaS ever becomes a goal.
+The ledger schema stays mode-agnostic so a future **platform escrow** model (a platform-owned merchant account + Midtrans Iris disbursements) remains a config + integration, not a rewrite — relevant only if multi-center SaaS ever becomes a goal.
 
 ## 6. Non-Functional (brief)
 
@@ -162,10 +162,11 @@ The ledger schema stays mode-agnostic so a future **platform escrow** model (you
 - Email notifications.
 
 **Out of scope (v1):**
-- Class topics / curriculum management (structured). *Free-text session notes remain in scope — this is the only concession to your original "teacher notes" requirement.*
+- Class topics / curriculum management (structured). *Free-text session notes remain in scope as the minimal form of teacher notes.*
 - Waitlists; recurring subscriptions/memberships; credit wallet beyond refund storage.
 - Rooms/resources scheduling; full SaaS multi-tenancy (separate businesses on one platform — schema is tenant-ready, auth/provisioning UI is not); branch-scoped admin roles (one admin manages all branches in v1).
 - Automated bank payouts; real-time chat; reviews/ratings; analytics beyond basic dashboard; multi-currency; WhatsApp notifications.
+- White-label theming (logo, colors, custom domain per deployment) — the post-MVP white-label path is sketched in §11.
 
 ---
 
@@ -198,7 +199,7 @@ This single flow exercises every requirement and every selling point (configurab
 
 **Resolved:**
 1. **Market & payment:** Indonesia, IDR, QRIS via **Midtrans Snap** (recommended over Xendit: more mature QRIS sandbox + refund API). Manual bank-transfer confirmation remains an optional fallback.
-2. **Refund handling:** the gateway refunds on our request via the refund API — your assumption works. One correction: the gateway does **not** hold money in escrow; QRIS funds settle to the center's bank T+1. "Money after class passes" is therefore satisfied as earned-revenue reporting (FR-8), not a gateway feature. Refund destination: admin-selectable (gateway refund or store credit), with automatic credit fallback if partial QRIS refunds prove unsupported.
+2. **Refund handling:** the gateway executes refunds on request via the refund API. Note: the gateway does **not** hold money in escrow; QRIS funds settle to the center's bank T+1. "Money after class passes" is therefore satisfied as earned-revenue reporting (FR-8), not a gateway feature. Refund destination: admin-selectable (gateway refund or store credit), with automatic credit fallback if partial QRIS refunds prove unsupported.
 3. **Attendance:** any assigned teacher may mark attendance.
 4. **Series booking window:** series ("package") bookings are only allowed before the first session starts. No mid-series prorating in v1 — one validation rule, no pricing controversy. Revisit prorating if a real center asks for it.
 5. **Multi-branch:** one organization owns N branches — classes belong to a branch; teachers, customers, students, and gateway keys are organization-wide; revenue reports filter per branch. Full SaaS multi-tenancy stays out of scope for v1.
@@ -208,3 +209,15 @@ This single flow exercises every requirement and every selling point (configurab
 2. UI language assumed Bahasa Indonesia — confirm.
 3. Partial QRIS refund support — verify in Milestone 0 spike (FR-6.4).
 4. Settlement: money settles directly to the center's bank (no gating), with earned-revenue reporting (§5.1). Platform escrow + Iris disbursements only if multi-center SaaS ever becomes a goal.
+
+---
+
+## 11. White-Label Path (post-MVP sketch)
+
+v1 ships as a single-center deployment. If the app is later sold to multiple centers as a **productized service** (setup fee + monthly retainer per center, one deployment each), the following become requirements. None of them change v1 scope; they are listed so v1 decisions don't accidentally close the door.
+
+- **WL-1 — Theming per deployment.** Center logo, primary color, name, favicon, email sender/templates, custom domain — all via config + asset files, never code branches. One codebase, N config packs.
+- **WL-2 — Merchant account ownership (required).** Each center registers its **own** Midtrans merchant account and enters keys in admin settings; the platform never holds funds (no escrow, no Iris disbursements). This locks in the recommended side of §10 open item 1 and keeps the operator out of the money flow — no payment-intermediary regulatory burden.
+- **WL-3 — Deployment packaging.** Docker Compose + env template + update runbook. Per-client deployment repos (private) hold config, branding assets, and keys; the product repo stays generic. New-client onboarding = a checklist, not a project.
+- **WL-4 — Premium add-ons (open-core candidates).** The v1 out-of-scope list doubles as the upgrade path: WhatsApp notifications, branch-scoped admin roles, memberships/subscriptions, deeper analytics. Each ships as a module behind a feature flag.
+- **WL-5 — Explicit non-goal: multi-tenant SaaS.** Many centers on one instance stays out until multiple paying white-label clients demand it. The schema is already tenant-ready (§3), so the option survives without rework.

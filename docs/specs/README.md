@@ -12,6 +12,8 @@ Ordering = risk × core-value per the PRD (M0 payment spike first). Build prereq
 - Cross-cutting decisions made once: UTC storage + branch-timezone rendering, BIGINT IDR money, append-only money tables, idempotency strategy, audit trail, webhook security.
 - Maps modules → sub-specs → PRD FRs; states dependency order.
 
+Full spec: [ENG-00-architecture.md](ENG-00-architecture.md)
+
 ## ENG-01 — Payments: Midtrans QRIS/VA Integration
 
 Ranked #1 for **risk**, not build order. Three deliverables in sequence:
