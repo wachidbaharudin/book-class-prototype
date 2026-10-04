@@ -8,11 +8,12 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "node scripts/check-framework-free.mjs && tsc -p tsconfig.json",
     "dev": "tsc -p tsconfig.json --watch --preserveWatchOutput",
     "lint": "eslint src",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --test"
+    "check:framework-free": "node scripts/check-framework-free.mjs",
+    "test": "pnpm run build && node --test"
   },
   "dependencies": {
     "zod": "^3.24.1"

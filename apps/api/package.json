@@ -8,7 +8,7 @@
     "start": "node dist/main.js",
     "lint": "eslint src",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --test"
+    "test": "echo \"(ENG-00-18 adds the Jest + Supertest harness)\""
   },
   "dependencies": {
     "@bookclass/shared": "workspace:*",

@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { APP_NAME } from '@bookclass/shared';
+import { APP_NAME, HealthResponseSchema, type HealthResponse } from '@bookclass/shared';
 
 @Injectable()
 export class AppService {
-  health(): { status: string; app: string } {
-    return { status: 'ok', app: APP_NAME };
+  health(): HealthResponse {
+    return HealthResponseSchema.parse({ status: 'ok', app: APP_NAME });
   }
 }
