@@ -3,8 +3,18 @@
 
 # Secrets / credentials
 .env
+.env.local
 .env.*
 !.env.example
 
 # OS noise
 .DS_Store
+
+# Dependencies & build output
+node_modules/
+dist/
+.next/
+out/
+coverage/
+*.tsbuildinfo
+next-env.d.ts

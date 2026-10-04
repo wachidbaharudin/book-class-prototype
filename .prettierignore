@@ -1,0 +1,10 @@
+node_modules
+dist
+.next
+coverage
+pnpm-lock.yaml
+apps/api/drizzle/meta
+docs
+prototypes
+PRD.md
+README.md
