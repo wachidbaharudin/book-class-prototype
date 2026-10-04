@@ -1,0 +1,19 @@
+# Reverse proxy for the single-instance deployment (ENG-00 §7).
+#
+#   /                      -> web (Next.js)
+#   /api/*                 -> api (NestJS)
+#   /api/webhooks/midtrans -> api (signature-verified, public via this route)
+#
+# DOMAIN is substituted from the environment; Caddy provisions TLS
+# automatically (ACME for real domains, internal CA for localhost).
+{$DOMAIN:localhost} {
+	encode zstd gzip
+
+	handle /api/* {
+		reverse_proxy api:4000
+	}
+
+	handle {
+		reverse_proxy web:3000
+	}
+}

@@ -1,0 +1,87 @@
+# Production topology (ENG-00 §7): one VPS, Docker Compose.
+#
+#   caddy :80/:443  auto-TLS + reverse proxy
+#   web   :3000     Next.js standalone server
+#   api   :4000     NestJS + in-process cron jobs
+#   db    :5432     PostgreSQL 16 (the invariants live here)
+#
+# Only Caddy is published. Bring up with:
+#   node scripts/compose.mjs -f docker-compose.yml up -d --build
+name: bookclass
+
+x-restart: &restart
+  restart: unless-stopped
+
+services:
+  caddy:
+    <<: *restart
+    image: caddy:2-alpine
+    ports:
+      - '80:80'
+      - '443:443'
+      - '443:443/udp'
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - web
+      - api
+
+  web:
+    <<: *restart
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+      API_INTERNAL_URL: http://api:4000
+    expose:
+      - '3000'
+    depends_on:
+      - api
+
+  api:
+    <<: *restart
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      NODE_ENV: production
+      API_PORT: 4000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-bookclass}:${POSTGRES_PASSWORD:-change-me}@db:5432/${POSTGRES_DB:-bookclass}
+      APP_ENCRYPTION_KEY: ${APP_ENCRYPTION_KEY:?set APP_ENCRYPTION_KEY in the deployment env}
+      MIDTRANS_IS_PRODUCTION: ${MIDTRANS_IS_PRODUCTION:-false}
+      MIDTRANS_CLIENT_KEY: ${MIDTRANS_CLIENT_KEY:-}
+      MIDTRANS_SERVER_KEY: ${MIDTRANS_SERVER_KEY:-}
+      MAILER_DSN: ${MAILER_DSN:-}
+    expose:
+      - '4000'
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    <<: *restart
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-bookclass}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+      POSTGRES_DB: ${POSTGRES_DB:-bookclass}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER:-bookclass} -d $${POSTGRES_DB:-bookclass}']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+volumes:
+  db-data:
+  caddy-data:
+  caddy-config:

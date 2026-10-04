@@ -1,0 +1,1 @@
+# Keeps apps/web/public in the tree so the production Dockerfile can copy it.
