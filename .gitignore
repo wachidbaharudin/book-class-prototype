@@ -1,0 +1,10 @@
+# Local agent config & skills — private, this repo is public
+.agents/
+
+# Secrets / credentials
+.env
+.env.*
+!.env.example
+
+# OS noise
+.DS_Store

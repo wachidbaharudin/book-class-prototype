@@ -1,9 +1,57 @@
 # ENG-00 — High-Level Architecture (umbrella)
 
-**Status:** Draft
-**PRD refs:** §1 (success criteria), §5.1, §6 (NFRs), §7 (scope), §9 (milestones), §10 (decisions)
-**Schema refs:** all of [SCHEMA.md](../SCHEMA.md) — esp. §1 (design principles), §5 (invariants), §8 (future-proofing)
-**Downstream consumers:** every ENG-01…09 spec — decisions here are made once and not re-litigated downstream
+![Status](https://img.shields.io/badge/status-draft-yellow)
+![Scope](https://img.shields.io/badge/scope-cross--cutting-blue)
+![Deployment](https://img.shields.io/badge/deployment-single--instance-green)
+
+| | |
+|---|---|
+| **Status** | Draft |
+| **PRD refs** | §1 (success criteria), §5.1, §6 (NFRs), §7 (scope), §9 (milestones), §10 (decisions) |
+| **Schema refs** | all of [SCHEMA.md](../SCHEMA.md) — esp. §1 (design principles), §5 (invariants), §8 (future-proofing) |
+| **Downstream consumers** | every ENG-01…09 spec — decisions here are made once and not re-litigated downstream |
+
+## Contents
+
+| | | | |
+|---|---|---|---|
+| 1 | [Why this spec exists](#1-why-this-spec-exists) | 7 | [Deployment topology](#7-deployment-topology-single-instance) |
+| 2 | [Goals / Non-goals](#2-goals--non-goals) | 8 | [Environments](#8-environments) |
+| 3 | [Tech stack](#3-tech-stack) | 9 | [Testing strategy](#9-testing-strategy) |
+| 4 | [Repository layout](#4-repository-layout) | 10 | [Acceptance criteria](#10-acceptance-criteria) |
+| 5 | [Module map → specs → PRD FRs](#5-module-map-nestjs--specs--prd-frs) | 11 | [Open questions](#11-open-questions) |
+| 6 | [Cross-cutting decisions](#6-cross-cutting-decisions-made-once) | | |
+
+## At a glance
+
+> 💡 **The big idea:** one deployable **modular monolith** for one learning center — Next.js + NestJS + PostgreSQL — with every rule that cuts across slices (time, money, idempotency, audit, webhook security, center scoping) pinned **once** in §6 and referenced, never redefined, by ENG-01…09.
+
+```mermaid
+flowchart LR
+    subgraph Clients
+        CUST["📱 Customer<br/>mobile-first"]
+        ADMIN["🖥️ Admin / Teacher<br/>desktop-first"]
+    end
+
+    subgraph VPS["☁️ One VPS — Docker Compose"]
+        WEB["web — Next.js<br/>(apps/web)"]
+        API["api — NestJS<br/>8 modules + in-process cron"]
+        DB[("db — PostgreSQL 16<br/>the invariants live here")]
+        WEB --> API
+        API --> DB
+    end
+
+    CUST --> WEB
+    ADMIN --> WEB
+    MID["💳 Midtrans<br/>sandbox ⇄ live = config flip"] -->|"webhook<br/>(signature-verified)"| API
+    API -->|"charges / refunds<br/>via PaymentProvider port"| MID
+    API -->|"Mailer port"| EMAIL["✉️ Email<br/>SMTP / Resend"]
+
+    classDef app fill:#e7f5ff,stroke:#1971c2;
+    classDef data fill:#d3f9d8,stroke:#2b8a3e;
+    classDef ext fill:#fff4e6,stroke:#d9480f;
+    class WEB,API app; class DB data; class MID,EMAIL ext;
+```
 
 ---
 
@@ -13,17 +61,19 @@ Sub-specs (ENG-01…09) each own one domain slice. This umbrella owns everything
 
 ## 2. Goals / Non-goals
 
-**Goals:**
-- G1: One deployable unit for one learning center (PRD SC-2): single instance, Docker Compose, sandbox→live as config flip.
-- G2: Module boundaries that map 1:1 onto ENG-01…09 so specs can be built in the README's dependency order without rework.
-- G3: Cross-cutting rules pinned once: UTC + branch-tz rendering, BIGINT IDR, append-only money tables, idempotency, audit trail, webhook security, center-scoped queries.
-- G4: Mobile-first customer UI, desktop-first admin/teacher UI (PRD §1.4) from one Next.js app.
+**🎯 Goals**
 
-**Non-goals (v1):**
+| # | Goal |
+|---|---|
+| **G1** | One deployable unit for one learning center (PRD SC-2): single instance, Docker Compose, sandbox→live as config flip |
+| **G2** | Module boundaries that map 1:1 onto ENG-01…09 so specs can be built in the README's dependency order without rework |
+| **G3** | Cross-cutting rules pinned once: UTC + branch-tz rendering, BIGINT IDR, append-only money tables, idempotency, audit trail, webhook security, center-scoped queries |
+| **G4** | Mobile-first customer UI, desktop-first admin/teacher UI (PRD §1.4) from one Next.js app |
+
+**🚫 Non-goals (v1)**
+
 - Multi-center SaaS provisioning, horizontal scaling, queue workers as separate processes, platform escrow (PRD §5.1 Mode 2). Schema stays ready; architecture stays single-instance.
 - Server-side rendering of admin pages for SEO — there is no SEO surface; customer browse pages are the only public surface and even those sit behind a center URL.
-
----
 
 ## 3. Tech stack
 
@@ -48,9 +98,15 @@ Sub-specs (ENG-01…09) each own one domain slice. This umbrella owns everything
 | Tests | Jest + Supertest (api), Vitest (web), Playwright e2e of the §8 demo script; Postgres in docker-compose for CI; ENG-01 MockAdapter ⇒ zero network in CI | |
 | Infra | one VPS, Docker Compose: `caddy` (auto-TLS + reverse proxy), `web`, `api`, `db` | single region (Indonesia); nightly `pg_dump` off-host |
 
-Rejected, with reasons: GraphQL/tRPC (REST+OpenAPI demos better to clients), Redis/BullMQ (single instance; cron + DB tables suffice), microservices (one deployable), Auth.js/Lucia (backend owns auth; ENG-07 specs the table), Prisma (schema language can't express CHECK constraints or partial unique indexes — SCHEMA §5 invariants would live in handwritten SQL, invisible in `schema.prisma`; §6 critical queries fall back to untyped `$queryRaw`, which client extensions don't intercept (XD-8 hole); codegen + postinstall friction under pnpm).
+**❌ Rejected, with reasons**
 
----
+| Rejected | Why |
+|---|---|
+| GraphQL / tRPC | REST + OpenAPI demos better to clients |
+| Redis / BullMQ | single instance; cron + DB tables suffice |
+| Microservices | one deployable unit |
+| Auth.js / Lucia | backend owns auth; ENG-07 specs the table |
+| Prisma | schema language can't express CHECK constraints or partial unique indexes — SCHEMA §5 invariants would live in handwritten SQL, invisible in `schema.prisma`; §6 critical queries fall back to untyped `$queryRaw`, which client extensions don't intercept (XD-8 hole); codegen + postinstall friction under pnpm |
 
 ## 4. Repository layout
 
@@ -67,9 +123,8 @@ docker-compose.yml
 docs/  PRD.md  prototypes/
 ```
 
-`packages/shared` must stay free of Nest/Next imports — plain TS so both apps and CI scripts can use it.
-
----
+> [!NOTE]
+> `packages/shared` must stay free of Nest/Next imports — plain TS so both apps and CI scripts can use it.
 
 ## 5. Module map (NestJS) → specs → PRD FRs
 
@@ -84,76 +139,173 @@ docs/  PRD.md  prototypes/
 | `attendance` | attendance, session_notes | ENG-08 | FR-7 |
 | `notifications` | notifications, Mailer port, templates | ENG-09 | FR-9 |
 
-**Boundary rules:**
-1. A table is **written by exactly one module**. Others read freely (SQL joins across boundaries are fine — this is a modular monolith, not microservices).
-2. State machines live with their owning module: `payments` status in `payments`, `booking_items` status in `booking`, transitions called through application services (SCHEMA §4).
-3. Cross-module side effects go through explicit service calls inside the caller's transaction where consistency demands it (e.g., payment `paid` → confirm items + insert settlement rows, one tx, per ENG-01 §4.3).
-4. Ports/adapters: `PaymentProvider` (ENG-01), `Mailer` (ENG-09) are constructor-injected interfaces; MockAdapter is the default outside production.
+> **📏 Boundary rules**
+> 1. A table is **written by exactly one module**. Others read freely (SQL joins across boundaries are fine — this is a modular monolith, not microservices).
+> 2. State machines live with their owning module: `payments` status in `payments`, `booking_items` status in `booking`, transitions called through application services (SCHEMA §4).
+> 3. Cross-module side effects go through explicit service calls inside the caller's transaction where consistency demands it (e.g., payment `paid` → confirm items + insert settlement rows, one tx, per ENG-01 §4.3).
+> 4. Ports/adapters: `PaymentProvider` (ENG-01), `Mailer` (ENG-09) are constructor-injected interfaces; MockAdapter is the default outside production.
 
-**Dependency order** (from specs README): risk path ENG-01(spike) → ENG-02 → ENG-05; ENG-07/03/04 safe in parallel; spec order 01→09. ENG-07 is the build prerequisite for everything (auth + center context) but is specced lean.
+**🗺️ Build order** (from specs README): risk path ENG-01(spike) → ENG-02 → ENG-05; ENG-07/03/04 safe in parallel; spec order 01→09. ENG-07 is the build prerequisite for everything (auth + center context) but is specced lean.
 
----
+```mermaid
+flowchart LR
+    subgraph RISK["⚠️ Risk path — spike first"]
+        direction TB
+        E01["ENG-01<br/>payments (spike)"] --> E02["ENG-02<br/>booking"] --> E05["ENG-05<br/>refunds"]
+    end
+    subgraph SAFE["✅ Safe in parallel"]
+        direction TB
+        E07["ENG-07<br/>identity"]
+        E03["ENG-03<br/>catalog"]
+        E04["ENG-04<br/>scheduling"]
+    end
+    E07 -.->|"build prerequisite for all:<br/>auth + center context"| E01
+    E05 --> TAIL["…then ENG-06 · ENG-08 · ENG-09<br/>(spec order 01→09)"]
+
+    classDef risk fill:#fff4e6,stroke:#d9480f;
+    classDef safe fill:#d3f9d8,stroke:#2b8a3e;
+    classDef tail fill:#f1f3f5,stroke:#868e96;
+    class E01,E02,E05 risk; class E07,E03,E04 safe; class TAIL tail;
+```
 
 ## 6. Cross-cutting decisions (made once)
 
-- **XD-1 Time.** Store UTC `TIMESTAMPTZ` only. Render in `branches.timezone` at the edge (API serializes ISO-UTC; UI converts with Luxon). Comparisons (cutoffs, expiry, marking windows) are instant math in UTC. Day-of-week / calendar-date rules (price rules, schedule generation) are computed **in the branch timezone**, then stored as UTC instants. Cron jobs schedule in UTC.
-- **XD-2 Money.** BIGINT IDR end-to-end (SCHEMA §1); no float crosses any boundary. In app code, money is a **Dinero.js v2** object; at DB and JSON edges it is a plain integer (Prisma BIGINT ↔ `toSnapshot().amount`). Division happens once — `package_price` split across items via `allocate()` (remainder distributed to the earliest items, SCHEMA §3.4) — and is snapshotted into `booking_items.unit_price`. Refund percentages use `multiply()` with an explicit rounding mode (mode pinned in ENG-05). Formatting is display-only (`Intl.NumberFormat('id-ID')`, IDR has no minor units).
-- **XD-3 Append-only money tables.** `payments`, `payment_events`, `refunds`, `credit_ledger`, `settlement_entries` accept forward-only status transitions; corrections are new rows, never edits. Guards live in the owning module's service; nobody `UPDATE`s another module's money rows.
-- **XD-4 Idempotency.** (a) Webhooks: unique `gateway_event_id`, duplicate = ack 200 no-op (I-3, ENG-01 §4.3). (b) Client mutations: `Idempotency-Key` header required on `POST /bookings`; key stored with the created booking so safe-retry returns the original. (c) Gateway calls: our `gateway_order_id` is the idempotency token (ENG-01 §4.1). (d) Unique DB constraints are the final backstop even if app logic races.
-- **XD-5 Audit.** Every money/refund row carries `created_by` (NULL = system). `payment_events` is the raw webhook trail. Booking-item cancellations keep `cancelled_at` + `cancel_reason`. Request logs carry actor id + request id. This satisfies FR-8.3's money trail without a separate audit table in v1.
-- **XD-6 Webhook security.** `POST /api/webhooks/midtrans` is unauthenticated-by-user but **signature-verified** (ENG-01 `parseWebhook`); raw body captured before parsing (Express `rawBody`). Verify → persist event (dedupe) → apply forward-only → 200 fast. No user cookies accepted on webhook routes; Midtrans IP allowlist optional defense-in-depth behind Caddy.
-- **XD-7 Transactions & locking.** Service methods own tx boundaries. `SELECT … FOR UPDATE` on the session row serializes bookings (I-1, SCHEMA §6.1) — via Drizzle `db.transaction()` + the typed `.for('update')` locking clause (`sql<T>` fragments for the rest of §6). Default isolation (read committed) is sufficient; no serializable transactions in v1.
-- **XD-8 Center scoping.** Request context resolves `center_id` (v1: the single center row); modules never receive the raw Drizzle client — a center-scoped wrapper (`src/common/center-context`) injects `center_id` into every query, and every table carries the column (SCHEMA §8). If multi-center SaaS ever happens, the upgrade is Postgres RLS (`SET app.center_id` per tx) — Drizzle declares RLS policies in-schema, so it's additive, not a rewrite. Kept strict now for the same reason.
-- **XD-9 Config.** Env validated with zod at boot (fail fast). Secrets only in env, never in DB except `midtrans_server_key_enc` (encrypted, §3). **Sandbox↔live is a config flip**: `centers.is_production` + gateway keys + base URL selection in the adapter; no code branches on environment (PRD SC-2, ENG-01 G5).
-- **XD-10 API conventions.** `/api/v1/…`; error envelope `{ "error": { "code", "message", "details?" } }` with codes exported from `packages/shared`; cursor pagination (`?cursor=`) on list endpoints; OpenAPI generated from Nest decorators and published in the repo.
+| # | Decision | One-liner |
+|---|---|---|
+| **XD-1** | ⏰ Time | Store UTC only; render in branch timezone at the edge |
+| **XD-2** | 💰 Money | BIGINT IDR end-to-end; Dinero.js in app, plain integers at the edges |
+| **XD-3** | 📒 Append-only money tables | Forward-only transitions; corrections are new rows, never edits |
+| **XD-4** | 🔁 Idempotency | Webhook dedupe · client `Idempotency-Key` · `gateway_order_id` · DB constraints as backstop |
+| **XD-5** | 🧾 Audit | `created_by` + `payment_events` trail + cancel metadata; no separate audit table in v1 |
+| **XD-6** | 🔐 Webhook security | Signature-verified, raw body, dedupe, fast 200; no user cookies |
+| **XD-7** | 🔒 Transactions & locking | `SELECT … FOR UPDATE` serializes bookings; read committed suffices |
+| **XD-8** | 🏢 Center scoping | Scoped wrapper injects `center_id` into every query; RLS is the future upgrade |
+| **XD-9** | ⚙️ Config | zod-validated env, fail fast; sandbox↔live = config flip only |
+| **XD-10** | 🔌 API conventions | `/api/v1`, error envelope, cursor pagination, generated OpenAPI |
 
----
+### XD-1 · ⏰ Time
+
+```mermaid
+flowchart LR
+    UI["🖥️ UI (Luxon)<br/>renders in branches.timezone"] <--> API["API serializes ISO-UTC<br/>comparisons = instant math in UTC"]
+    API <--> DB[("TIMESTAMPTZ<br/>UTC only")]
+```
+
+Store UTC `TIMESTAMPTZ` only. Render in `branches.timezone` at the edge (API serializes ISO-UTC; UI converts with Luxon). Comparisons (cutoffs, expiry, marking windows) are instant math in UTC. Day-of-week / calendar-date rules (price rules, schedule generation) are computed **in the branch timezone**, then stored as UTC instants. Cron jobs schedule in UTC.
+
+### XD-2 · 💰 Money
+
+BIGINT IDR end-to-end (SCHEMA §1); no float crosses any boundary. In app code, money is a **Dinero.js v2** object; at DB and JSON edges it is a plain integer (Prisma BIGINT ↔ `toSnapshot().amount`). Division happens once — `package_price` split across items via `allocate()` (remainder distributed to the earliest items, SCHEMA §3.4) — and is snapshotted into `booking_items.unit_price`. Refund percentages use `multiply()` with an explicit rounding mode (mode pinned in ENG-05). Formatting is display-only (`Intl.NumberFormat('id-ID')`, IDR has no minor units).
+
+### XD-3 · 📒 Append-only money tables
+
+`payments`, `payment_events`, `refunds`, `credit_ledger`, `settlement_entries` accept forward-only status transitions; corrections are new rows, never edits. Guards live in the owning module's service; nobody `UPDATE`s another module's money rows.
+
+### XD-4 · 🔁 Idempotency
+
+| Layer | Mechanism |
+|---|---|
+| (a) Webhooks | unique `gateway_event_id`; duplicate = ack 200 no-op (I-3, ENG-01 §4.3) |
+| (b) Client mutations | `Idempotency-Key` header required on `POST /bookings`; key stored with the created booking so safe-retry returns the original |
+| (c) Gateway calls | our `gateway_order_id` is the idempotency token (ENG-01 §4.1) |
+| (d) Backstop | unique DB constraints catch it even if app logic races |
+
+### XD-5 · 🧾 Audit
+
+Every money/refund row carries `created_by` (NULL = system). `payment_events` is the raw webhook trail. Booking-item cancellations keep `cancelled_at` + `cancel_reason`. Request logs carry actor id + request id. This satisfies FR-8.3's money trail without a separate audit table in v1.
+
+### XD-6 · 🔐 Webhook security
+
+```mermaid
+flowchart LR
+    W["POST /api/webhooks/midtrans<br/>no user cookies accepted"] --> V["1️⃣ Verify signature<br/>(raw body captured before parsing)"]
+    V --> P["2️⃣ Persist event<br/>(dedupe)"]
+    P --> A["3️⃣ Apply forward-only"]
+    A --> R["✅ 200 fast"]
+
+    classDef step fill:#e7f5ff,stroke:#1971c2;
+    class V,P,A step;
+```
+
+`POST /api/webhooks/midtrans` is unauthenticated-by-user but **signature-verified** (ENG-01 `parseWebhook`); raw body captured before parsing (Express `rawBody`). Verify → persist event (dedupe) → apply forward-only → 200 fast. No user cookies accepted on webhook routes; Midtrans IP allowlist optional defense-in-depth behind Caddy.
+
+### XD-7 · 🔒 Transactions & locking
+
+Service methods own tx boundaries. `SELECT … FOR UPDATE` on the session row serializes bookings (I-1, SCHEMA §6.1) — via Drizzle `db.transaction()` + the typed `.for('update')` locking clause (`sql<T>` fragments for the rest of §6). Default isolation (read committed) is sufficient; no serializable transactions in v1.
+
+### XD-8 · 🏢 Center scoping
+
+Request context resolves `center_id` (v1: the single center row); modules never receive the raw Drizzle client — a center-scoped wrapper (`src/common/center-context`) injects `center_id` into every query, and every table carries the column (SCHEMA §8). If multi-center SaaS ever happens, the upgrade is Postgres RLS (`SET app.center_id` per tx) — Drizzle declares RLS policies in-schema, so it's additive, not a rewrite. Kept strict now for the same reason.
+
+### XD-9 · ⚙️ Config
+
+Env validated with zod at boot (fail fast). Secrets only in env, never in DB except `midtrans_server_key_enc` (encrypted, §3). **Sandbox↔live is a config flip**: `centers.is_production` + gateway keys + base URL selection in the adapter; no code branches on environment (PRD SC-2, ENG-01 G5).
+
+### XD-10 · 🔌 API conventions
+
+`/api/v1/…`; error envelope `{ "error": { "code", "message", "details?" } }` with codes exported from `packages/shared`; cursor pagination (`?cursor=`) on list endpoints; OpenAPI generated from Nest decorators and published in the repo.
 
 ## 7. Deployment topology (single instance)
 
-```
-                 ┌──────────── one VPS (Indonesia region) ───────────┐
- internet ─TLS─▶ │ caddy :443                                        │
-                 │   ├─ /            → web (Next.js) :3000           │
-                 │   └─ /api, /api/webhooks/midtrans → api :4000     │
-                 │ api (NestJS) :4000 ──▶ db (Postgres 16) :5432     │
-                 │   └─ cron jobs run in-process (@nestjs/schedule)  │
-                 │ nightly pg_dump → off-host storage                │
-                 └───────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    NET["🌐 internet"] -->|"TLS"| CADDY
+    MID["💳 Midtrans"] -->|"webhook<br/>https://&lt;domain&gt;/api/webhooks/midtrans"| CADDY
+
+    subgraph VPS["One VPS — Indonesia region — Docker Compose"]
+        CADDY["caddy :443<br/>auto-TLS + reverse proxy"]
+        WEB["web (Next.js) :3000"]
+        API["api (NestJS) :4000<br/>⏰ cron jobs in-process (@nestjs/schedule)"]
+        DB[("db (Postgres 16) :5432")]
+        CADDY -->|"route /"| WEB
+        CADDY -->|"route /api · /api/webhooks/midtrans"| API
+        API --> DB
+    end
+
+    DB -.->|"nightly pg_dump"| BK["🗄️ off-host storage"]
+
+    classDef edge fill:#fff4e6,stroke:#d9480f;
+    classDef app fill:#e7f5ff,stroke:#1971c2;
+    classDef data fill:#d3f9d8,stroke:#2b8a3e;
+    class NET,MID edge; class CADDY,WEB,API app; class DB,BK data;
 ```
 
 - Midtrans webhook target: `https://<domain>/api/webhooks/midtrans` — public via Caddy; no tunnel needed in production, `ngrok`-style tunnel acceptable for local sandbox testing.
 - One compose file for prod; `docker-compose.dev.yml` adds hot-reload + exposed db port.
 - Backup/restore: nightly `pg_dump`, documented restore drill; append-only money tables make point-in-time reasoning easy but are **not** a backup substitute.
-- Scaling story if ever needed: db → managed Postgres, api → N replicas behind Caddy with jobs pinned to one replica (env flag), web → CDN. Documented here so the single-instance choice is a decision, not an accident.
+- 📈 Scaling story if ever needed: db → managed Postgres, api → N replicas behind Caddy with jobs pinned to one replica (env flag), web → CDN. Documented here so the single-instance choice is a decision, not an accident.
 
 ## 8. Environments
 
 | Env | Purpose | Gateway | DB |
 |---|---|---|---|
-| local dev | laptop | MockAdapter (Midtrans sandbox on demand) | docker-compose Postgres |
-| CI | Jest/Vitest/Playwright | MockAdapter only, zero network | ephemeral Postgres service |
-| staging/demo | the §8 demo script, `is_production=false` | Midtrans sandbox, real webhooks via tunnel/staging URL | persistent |
-| prod | real center | live keys via config flip only | persistent + backups |
+| 🧑‍💻 local dev | laptop | MockAdapter (Midtrans sandbox on demand) | docker-compose Postgres |
+| 🤖 CI | Jest/Vitest/Playwright | MockAdapter only, zero network | ephemeral Postgres service |
+| 🎭 staging/demo | the §8 demo script, `is_production=false` | Midtrans sandbox, real webhooks via tunnel/staging URL | persistent |
+| 🚀 prod | real center | live keys via config flip only | persistent + backups |
 
 ## 9. Testing strategy
 
-- **Unit (Jest/Vitest):** pricing resolution (BR-1), policy evaluation (BR-3/6), price-share division (BR-4) — pure functions in modules.
-- **API integration (Supertest + real Postgres):** every invariant I-1…I-8 gets one test; seat-lock overbooking test fires N concurrent booking requests and asserts capacity is never exceeded.
-- **Contract:** `PaymentProvider` MockAdapter and MidtransAdapter share one test suite (ENG-01 §4) so sandbox behavior is provably mirrored by the mock.
-- **E2E (Playwright):** the 10-minute demo script (PRD §8) is the smoke suite for staging.
+| Layer | Tools | What it proves |
+|---|---|---|
+| **Unit** | Jest (api) / Vitest (web) | pricing resolution (BR-1), policy evaluation (BR-3/6), price-share division (BR-4) — pure functions in modules |
+| **API integration** | Supertest + real Postgres | every invariant I-1…I-8 gets one test; seat-lock overbooking test fires N concurrent booking requests and asserts capacity is never exceeded |
+| **Contract** | shared suite: MockAdapter + MidtransAdapter | sandbox behavior is provably mirrored by the mock (ENG-01 §4) |
+| **E2E** | Playwright | the 10-minute demo script (PRD §8) is the smoke suite for staging |
 
 ## 10. Acceptance criteria
 
-1. `pnpm dev` brings up web+api+db from a clean clone with one compose command; the §8 demo runs end-to-end against MockAdapter with zero external network.
-2. Every §6 decision is enforced somewhere checkable: UTC-only columns (migration lint), integer money types (shared zod), append-only guard tests, webhook replay test, center-scope wrapper test.
-3. OpenAPI spec generates and matches `packages/shared` DTOs.
-4. Sandbox↔live flip demonstrated by config diff only (ENG-01 AC-6 depends on this).
-5. Backup restore drill documented and executed once on staging.
+- [ ] **AC-1** — `pnpm dev` brings up web+api+db from a clean clone with one compose command; the §8 demo runs end-to-end against MockAdapter with zero external network.
+- [ ] **AC-2** — Every §6 decision is enforced somewhere checkable: UTC-only columns (migration lint), integer money types (shared zod), append-only guard tests, webhook replay test, center-scope wrapper test.
+- [ ] **AC-3** — OpenAPI spec generates and matches `packages/shared` DTOs.
+- [ ] **AC-4** — Sandbox↔live flip demonstrated by config diff only (ENG-01 AC-6 depends on this).
+- [ ] **AC-5** — Backup restore drill documented and executed once on staging.
 
 ## 11. Open questions
 
-- OQ-1: Hosting target for the single VPS (provider/region) — needed before staging; does not block build.
-- OQ-2: Email provider for the demo (plain SMTP vs Resend) — ENG-09 decides; Mailer port is unaffected.
-- OQ-3: Bahasa Indonesia copy source of truth (PRD §10.2) — assume a `packages/shared` i18n dictionary; confirm before ENG-09 templates.
-- OQ-4: Session cookie vs short-lived token if a mobile app appears post-MVP — noted seam; ENG-07 owns the decision when it matters.
+| # | Question | Owner / timing |
+|---|---|---|
+| **OQ-1** | Hosting target for the single VPS (provider/region) | needed before staging; does not block build |
+| **OQ-2** | Email provider for the demo (plain SMTP vs Resend) | ENG-09 decides; Mailer port is unaffected |
+| **OQ-3** | Bahasa Indonesia copy source of truth (PRD §10.2) — assume a `packages/shared` i18n dictionary | confirm before ENG-09 templates |
+| **OQ-4** | Session cookie vs short-lived token if a mobile app appears post-MVP | noted seam; ENG-07 owns the decision when it matters |

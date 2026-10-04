@@ -197,13 +197,13 @@ Evaluation: `rule with max(hours_before) where hours_before <= hours_until_start
 |---|---|---|
 | id | BIGSERIAL PK | |
 | center_id, booking_id | FK UNIQUE | |
-| method | ENUM('qris','va','manual','store_credit') NOT NULL | |
+| method | ENUM('qris','manual','store_credit') NOT NULL | single Core API gateway channel: QRIS (GoPay acquirer) (FR-5.3) |
 | status | ENUM('pending','paid','failed','expired') DEFAULT 'pending' | refund state lives in `refunds`, not here |
 | amount | BIGINT NOT NULL CHECK (>= 0) | |
 | currency | CHAR(3) DEFAULT 'IDR' | |
 | gateway_order_id, gateway_transaction_id | TEXT NULL | Midtrans ids |
-| qr_string | TEXT NULL | QRIS payload to render (FR-5.1) |
-| expires_at | TIMESTAMPTZ NOT NULL | seat-hold deadline; default now()+30min for QRIS, longer for VA (BR-2) |
+| qr_code_url | TEXT NULL | Core API `generate-qr-code` action URL to render (FR-5.1) |
+| expires_at | TIMESTAMPTZ NOT NULL | seat-hold deadline; default now()+30min via Core API `custom_expiry` — GoPay QRIS bounds 20s–7d (BR-2) |
 | paid_at | TIMESTAMPTZ NULL | |
 
 **payment_events** — webhook audit + idempotency.

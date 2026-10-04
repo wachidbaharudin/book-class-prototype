@@ -14,13 +14,13 @@ Ordering = risk × core-value per the PRD (M0 payment spike first). Build prereq
 
 Full spec: [ENG-00-architecture.md](ENG-00-architecture.md)
 
-## ENG-01 — Payments: Midtrans QRIS/VA Integration
+## ENG-01 — Payments: Midtrans Core API (QRIS, GoPay acquirer) Integration
 
 Ranked #1 for **risk**, not build order. Three deliverables in sequence:
 
-1. **Spike (M0):** answer gateway unknowns before they contaminate ENG-02/05/06 — partial QRIS refund support (PRD §10.3), refund-after-settlement / insufficient-balance behavior (BR-8), refund window, QR expiry configurability, webhook retry/signature/ordering.
+1. **Spike (M0):** answer gateway unknowns before they contaminate ENG-02/05/06 — full/partial refunds on GoPay-acquired QRIS (PRD §10.3), refund-after-settlement / insufficient-balance behavior (BR-8), refund windows (on-us 45d / off-us 7d), QR expiry configurability, webhook retry/signature/ordering, Core API `actions[]` QR-action handling.
 2. **`PaymentProvider` interface + MockAdapter:** unblocks ENG-02/03/04 against a deterministic fake.
-3. **MidtransAdapter:** webhook-verified, idempotent payment state machine (FR-5); refund API with store-credit fallback (BR-8/9); sandbox → live as config-only flip (PRD SC-2).
+3. **MidtransAdapter:** Core API charge (`/v2/charge`) + webhook-verified, idempotent payment state machine (FR-5); refund API with store-credit fallback (BR-8/9); sandbox → live as config-only flip (PRD SC-2).
 
 Full spec: [ENG-01-payments.md](ENG-01-payments.md)
 

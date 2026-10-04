@@ -18,7 +18,7 @@ CREATE TYPE price_rule_type   AS ENUM ('date','dow');
 CREATE TYPE booking_type      AS ENUM ('session','series');
 CREATE TYPE booking_status    AS ENUM ('pending_payment','paid','cancelled','partially_cancelled');
 CREATE TYPE booking_item_status AS ENUM ('pending_payment','confirmed','cancelled','completed','no_show');
-CREATE TYPE payment_method    AS ENUM ('qris','va','manual','store_credit');
+CREATE TYPE payment_method    AS ENUM ('qris','manual','store_credit');  -- FR-5.3: single Core API gateway channel — QRIS (GoPay acquirer) only
 CREATE TYPE payment_status    AS ENUM ('pending','paid','failed','expired');
 CREATE TYPE refund_method     AS ENUM ('gateway','store_credit');
 CREATE TYPE refund_status     AS ENUM ('pending','succeeded','failed');
@@ -223,8 +223,8 @@ CREATE TABLE payments (
     currency                     CHAR(3) NOT NULL DEFAULT 'IDR',
     gateway_order_id             TEXT,               -- Midtrans order id
     gateway_transaction_id       TEXT,               -- Midtrans transaction id
-    qr_string                    TEXT,               -- QRIS payload to render (FR-5.1)
-    expires_at                   TIMESTAMPTZ NOT NULL,  -- seat-hold deadline (BR-2)
+    qr_code_url                  TEXT,               -- Core API generate-qr-code action URL to render (FR-5.1)
+    expires_at                   TIMESTAMPTZ NOT NULL,  -- seat-hold deadline (BR-2); default now()+30min via Core API custom_expiry (GoPay QRIS bounds 20s-7d)
     paid_at                      TIMESTAMPTZ,
     created_at                   TIMESTAMPTZ NOT NULL DEFAULT now(),
     CONSTRAINT ux_payments_booking UNIQUE (booking_id),      -- one payment per booking
