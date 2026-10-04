@@ -20,7 +20,7 @@
 | 3 | [Tech stack](#3-tech-stack) | 9 | [Testing strategy](#9-testing-strategy) |
 | 4 | [Repository layout](#4-repository-layout) | 10 | [Acceptance criteria](#10-acceptance-criteria) |
 | 5 | [Module map → specs → PRD FRs](#5-module-map-nestjs--specs--prd-frs) | 11 | [Open questions](#11-open-questions) |
-| 6 | [Cross-cutting decisions](#6-cross-cutting-decisions-made-once) | | |
+| 6 | [Cross-cutting decisions](#6-cross-cutting-decisions-made-once) | 12 | [Breakdown issues](#12-breakdown-issues) |
 
 ## At a glance
 
@@ -309,3 +309,42 @@ flowchart TB
 | **OQ-2** | Email provider for the demo (plain SMTP vs Resend) | ENG-09 decides; Mailer port is unaffected |
 | **OQ-3** | Bahasa Indonesia copy source of truth (PRD §10.2) — assume a `packages/shared` i18n dictionary | confirm before ENG-09 templates |
 | **OQ-4** | Session cookie vs short-lived token if a mobile app appears post-MVP | noted seam; ENG-07 owns the decision when it matters |
+
+## 12. Breakdown issues
+
+Tickets below cover only what this umbrella owns; each ENG-01…09 spec breaks down its own domain slice. `Depends on` links to the blocking issue.
+
+### Foundation & scaffolding
+
+| Ticket | Title | Scope | Depends on | Link |
+|---|---|---|---|---|
+| **ENG-00-01** | Monorepo scaffold (`pnpm` workspaces: `apps/web`, `apps/api`, `packages/shared`) | §4 | — | [#1](https://github.com/wachidbaharudin/book-class-prototype/issues/1) |
+| **ENG-00-02** | Dev compose + Postgres service (hot-reload, exposed db port) | §7, §8 | [#1](https://github.com/wachidbaharudin/book-class-prototype/issues/1) | [#2](https://github.com/wachidbaharudin/book-class-prototype/issues/2) |
+| **ENG-00-03** | Prod compose topology (`caddy`/`web`/`api`/`db`) + backup & restore drill | §7, AC-5 | [#1](https://github.com/wachidbaharudin/book-class-prototype/issues/1), [#2](https://github.com/wachidbaharudin/book-class-prototype/issues/2) | [#3](https://github.com/wachidbaharudin/book-class-prototype/issues/3) |
+| **ENG-00-04** | `packages/shared`: zod DTOs, error codes, role enum, BR constants (framework-free) | §3, §4 | [#1](https://github.com/wachidbaharudin/book-class-prototype/issues/1) | [#4](https://github.com/wachidbaharudin/book-class-prototype/issues/4) |
+| **ENG-00-05** | Drizzle schema mirroring `docs/schema.sql` 1:1 + baseline migration | §3 | [#1](https://github.com/wachidbaharudin/book-class-prototype/issues/1) | [#5](https://github.com/wachidbaharudin/book-class-prototype/issues/5) |
+
+### Cross-cutting platform (§6)
+
+| Ticket | Title | Scope | Depends on | Link |
+|---|---|---|---|---|
+| **ENG-00-06** | Config module: zod-validated env, fail-fast; sandbox↔live as config flip | XD-9 | [#1](https://github.com/wachidbaharudin/book-class-prototype/issues/1) | [#6](https://github.com/wachidbaharudin/book-class-prototype/issues/6) |
+| **ENG-00-07** | Center-context scoped DB wrapper (injects `center_id`, no raw client) | XD-8 | [#5](https://github.com/wachidbaharudin/book-class-prototype/issues/5) | [#7](https://github.com/wachidbaharudin/book-class-prototype/issues/7) |
+| **ENG-00-08** | Money helper: Dinero.js v2 internally, BIGINT IDR at edges, `allocate()` | XD-2 | [#4](https://github.com/wachidbaharudin/book-class-prototype/issues/4) | [#8](https://github.com/wachidbaharudin/book-class-prototype/issues/8) |
+| **ENG-00-09** | Clock helper: UTC store, branch-tz rendering via Luxon, cron in UTC | XD-1 | [#4](https://github.com/wachidbaharudin/book-class-prototype/issues/4) | [#9](https://github.com/wachidbaharudin/book-class-prototype/issues/9) |
+| **ENG-00-10** | Idempotency: client `Idempotency-Key`, `gateway_order_id`, dedupe constraints | XD-4 | [#5](https://github.com/wachidbaharudin/book-class-prototype/issues/5), [#7](https://github.com/wachidbaharudin/book-class-prototype/issues/7) | [#10](https://github.com/wachidbaharudin/book-class-prototype/issues/10) |
+| **ENG-00-11** | Audit helpers: `created_by`, `payment_events` trail, cancel metadata | XD-5 | [#5](https://github.com/wachidbaharudin/book-class-prototype/issues/5), [#7](https://github.com/wachidbaharudin/book-class-prototype/issues/7) | [#11](https://github.com/wachidbaharudin/book-class-prototype/issues/11) |
+| **ENG-00-12** | Transactions & locking primitives (tx boundary + `SELECT … FOR UPDATE` pattern) | XD-7 | [#5](https://github.com/wachidbaharudin/book-class-prototype/issues/5) | [#12](https://github.com/wachidbaharudin/book-class-prototype/issues/12) |
+| **ENG-00-13** | API conventions: `/api/v1`, error envelope, cursor pagination, OpenAPI output | XD-10, AC-3 | [#4](https://github.com/wachidbaharudin/book-class-prototype/issues/4), [#6](https://github.com/wachidbaharudin/book-class-prototype/issues/6) | [#13](https://github.com/wachidbaharudin/book-class-prototype/issues/13) |
+| **ENG-00-14** | Webhook plumbing: raw-body capture, signature verify, no-cookie route | XD-6 | [#6](https://github.com/wachidbaharudin/book-class-prototype/issues/6), [#13](https://github.com/wachidbaharudin/book-class-prototype/issues/13) | [#14](https://github.com/wachidbaharudin/book-class-prototype/issues/14) |
+| **ENG-00-15** | Cron/jobs scaffolding (`@nestjs/schedule`, in-process, thin job entrypoints) | §3, §5 | [#6](https://github.com/wachidbaharudin/book-class-prototype/issues/6) | [#15](https://github.com/wachidbaharudin/book-class-prototype/issues/15) |
+
+### Ports, extensions & verification
+
+| Ticket | Title | Scope | Depends on | Link |
+|---|---|---|---|---|
+| **ENG-00-16** | Ports & adapters: `PaymentProvider` + `MockAdapter`, `Mailer` + default SMTP | §3, §5 | [#6](https://github.com/wachidbaharudin/book-class-prototype/issues/6), [#13](https://github.com/wachidbaharudin/book-class-prototype/issues/13) | [#16](https://github.com/wachidbaharudin/book-class-prototype/issues/16) |
+| **ENG-00-17** | Web app shell: App Router groups, mobile-first customer / desktop-first admin, Tailwind + shadcn | §3, §4, G4 | [#1](https://github.com/wachidbaharudin/book-class-prototype/issues/1), [#4](https://github.com/wachidbaharudin/book-class-prototype/issues/4) | [#17](https://github.com/wachidbaharudin/book-class-prototype/issues/17) |
+| **ENG-00-18** | Test harness: Jest+Supertest (api), Vitest (web), Playwright e2e, MockAdapter contract suite | §9 | [#5](https://github.com/wachidbaharudin/book-class-prototype/issues/5), [#16](https://github.com/wachidbaharudin/book-class-prototype/issues/16) | [#18](https://github.com/wachidbaharudin/book-class-prototype/issues/18) |
+| **ENG-00-19** | CI pipeline: ephemeral Postgres, zero external network, migration/invariant lint (AC-2) | §8, §9, AC-2 | [#2](https://github.com/wachidbaharudin/book-class-prototype/issues/2), [#18](https://github.com/wachidbaharudin/book-class-prototype/issues/18) | [#19](https://github.com/wachidbaharudin/book-class-prototype/issues/19) |
+
