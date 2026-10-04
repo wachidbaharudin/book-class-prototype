@@ -1,0 +1,96 @@
+# Local development topology (ENG-00 §7, §8).
+#
+# One command from a clean clone: `pnpm dev`
+#   db        Postgres 16, published on the host for drizzle-kit/psql
+#   prepare   one-shot `pnpm install` + builds @bookclass/shared
+#   api       NestJS watch mode, hot-reload via the bind mount
+#   web       Next.js dev server, hot-reload via the bind mount
+#
+# `node_modules` lives in named volumes so container (linux) installs never
+# clobber a developer's host (darwin/linux) install.
+name: bookclass-dev
+
+x-app: &app
+  image: bookclass-dev-node
+  build:
+    context: .
+    dockerfile: Dockerfile.dev
+  working_dir: /workspace
+  environment:
+    NODE_ENV: development
+  volumes:
+    - .:/workspace
+    - pnpm-store:/pnpm-store
+    - root-node-modules:/workspace/node_modules
+    - api-node-modules:/workspace/apps/api/node_modules
+    - web-node-modules:/workspace/apps/web/node_modules
+    - shared-node-modules:/workspace/packages/shared/node_modules
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-bookclass}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+      POSTGRES_DB: ${POSTGRES_DB:-bookclass}
+    ports:
+      - '${POSTGRES_PORT:-5433}:5432'
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER:-bookclass} -d $${POSTGRES_DB:-bookclass}']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  prepare:
+    <<: *app
+    restart: 'no'
+    environment:
+      NODE_ENV: development
+      # Non-interactive: allow pnpm to reconcile the modules dir when the store moves.
+      CI: 'true'
+    command: sh -c "pnpm install --frozen-lockfile && pnpm --filter @bookclass/shared build"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    <<: *app
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      API_PORT: ${API_PORT:-4000}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-bookclass}:${POSTGRES_PASSWORD:-change-me}@db:5432/${POSTGRES_DB:-bookclass}
+    ports:
+      - '${API_PORT:-4000}:${API_PORT:-4000}'
+    command: sh -c "pnpm --filter @bookclass/api dev"
+    depends_on:
+      prepare:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+
+  web:
+    <<: *app
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      WEB_PORT: ${WEB_PORT:-3001}
+      API_INTERNAL_URL: http://api:${API_PORT:-4000}
+    ports:
+      - '${WEB_PORT:-3001}:${WEB_PORT:-3001}'
+    command: sh -c "pnpm --filter @bookclass/web dev"
+    depends_on:
+      prepare:
+        condition: service_completed_successfully
+
+volumes:
+  db-data:
+  pnpm-store:
+  root-node-modules:
+  api-node-modules:
+  web-node-modules:
+  shared-node-modules:

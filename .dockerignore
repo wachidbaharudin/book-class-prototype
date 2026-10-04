@@ -1,0 +1,15 @@
+.git
+.agents
+node_modules
+**/node_modules
+dist
+**/dist
+.next
+**/.next
+coverage
+**/coverage
+.pnpm-store
+*.log
+.env
+.env.*
+!.env.example
