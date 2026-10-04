@@ -16,6 +16,7 @@
     "docker:prod:down": "node scripts/compose.mjs -f docker-compose.yml down",
     "db:backup": "bash scripts/backup.sh",
     "db:restore": "bash scripts/restore.sh",
+    "db:migrate": "pnpm --filter @bookclass/api db:migrate",
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",

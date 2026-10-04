@@ -2,7 +2,7 @@
 
 A configurable booking platform for learning centers: publish classes, take online payments, and track attendance, cancellations, refunds, and earned revenue — deployable per center with configuration only, no code changes.
 
-**Status:** specification phase — architecture and payments specs are drafted; application code is not yet in the tree. See [Milestones](#milestones).
+**Status:** foundation scaffolded — pnpm monorepo, dev/prod Compose topology, framework-free `packages/shared`, and the Drizzle schema + baseline migration are in the tree. Feature slices (ENG-01…09) build on top. See [Milestones](#milestones).
 
 ---
 
@@ -42,32 +42,23 @@ Product knowledge and engineering specs are versioned alongside the code so a ch
 
 ## Repository layout
 
-Current contents:
-
-```
-PRD.md                     product requirements
-README.md                  this file
-docs/
-  SCHEMA.md                data model + invariants
-  schema.sql               baseline SQL schema
-  specs/                   ENG-00…09 engineering specs + index
-  research/                primary-source research notes
-prototypes/                static HTML prototypes
-```
-
-Target layout once implementation starts (per [ENG-00 §4](docs/specs/ENG-00-architecture.md)):
-
 ```
 apps/
-  web/                     Next.js — (customer) / (admin) / (teacher) route groups
-  api/                     NestJS — src/modules/<domain>, src/common, src/db, src/jobs
+  web/                     Next.js App Router — (customer) / (admin) / (teacher) groups
+  api/
+    src/db/                Drizzle schema (mirrors docs/schema.sql 1:1), client, migrations
+    src/modules/           one folder per domain module (ENG-01…09)
 packages/
-  shared/                  zod DTOs, error codes, role enum, business-rule constants
-docker-compose.yml
-pnpm-workspace.yaml
+  shared/                  framework-free zod DTOs, error codes, role enum, BR constants
+scripts/                   Compose + backup/restore helpers
+Caddyfile                  production reverse proxy
+Dockerfile.dev             Compose development image
+docker-compose.yml         production topology (caddy/web/api/db)
+docker-compose.dev.yml     local dev topology (hot-reload + exposed db)
+docs/ops/deployment.md     deploy, backup/restore drill, scaling story
 ```
 
-`packages/shared` stays free of Nest/Next imports — plain TypeScript so both apps and CI scripts can consume it.
+`packages/shared` stays free of Nest/Next imports — plain TypeScript so both apps and CI scripts can consume it, enforced by `packages/shared/scripts/check-framework-free.mjs`.
 
 ---
 
@@ -94,15 +85,18 @@ Database-level invariants (seat locking, partial unique indexes, append-only mon
 
 ## Getting started
 
-Implementation scaffolding does not exist yet. Once `apps/` lands, the intended local workflow is:
+The scaffold is in place; feature slices land on top.
 
 ```bash
 pnpm install
-cp .env.example .env      # fill in placeholders
-docker compose up -d db   # PostgreSQL 16
-pnpm --filter api drizzle-kit migrate
-pnpm dev                  # web + api
+cp .env.example .env                       # placeholders are fine for local dev
+pnpm dev                                   # db + api + web via Docker Compose (hot-reload)
+pnpm --filter @bookclass/api db:migrate    # apply the baseline schema once the stack is up
 ```
+
+- web → http://localhost:3001 · api → http://localhost:4000/api/v1
+- `pnpm dev:down` stops the stack; `pnpm db:backup` / `pnpm db:restore` exercise the ops drill.
+- Production deploy, backup/restore runbook, and the scaling story: [docs/ops/deployment.md](docs/ops/deployment.md).
 
 ### Configuration & secrets
 

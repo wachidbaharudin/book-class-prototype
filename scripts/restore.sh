@@ -27,21 +27,22 @@ set -a; [ -f .env ] && . ./.env; set +a
 : "${POSTGRES_USER:=bookclass}"
 : "${POSTGRES_DB:=bookclass}"
 TARGET_DB="${2:-${POSTGRES_DB}_restore}"
+COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.yml}"
 
 echo "==> recreating scratch database ${TARGET_DB}"
-"${COMPOSE[@]}" -f docker-compose.yml exec -T db \
+"${COMPOSE[@]}" -f "$COMPOSE_FILE" exec -T db \
   psql -U "$POSTGRES_USER" -d postgres -v ON_ERROR_STOP=1 \
   -c "DROP DATABASE IF EXISTS \"${TARGET_DB}\";" \
   -c "CREATE DATABASE \"${TARGET_DB}\";"
 
 echo "==> restoring ${DUMP_FILE} into ${TARGET_DB}"
-"${COMPOSE[@]}" -f docker-compose.yml exec -T db \
+"${COMPOSE[@]}" -f "$COMPOSE_FILE" exec -T db \
   pg_restore -U "$POSTGRES_USER" -d "$TARGET_DB" --no-owner --no-acl --exit-on-error < "$DUMP_FILE"
 
 echo "==> smoke check (table count in ${TARGET_DB})"
-"${COMPOSE[@]}" -f docker-compose.yml exec -T db \
+"${COMPOSE[@]}" -f "$COMPOSE_FILE" exec -T db \
   psql -U "$POSTGRES_USER" -d "$TARGET_DB" -tAc \
   "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public';"
 
 echo "==> restore drill complete. Drop the scratch db when done:"
-echo "    ${COMPOSE[*]} -f docker-compose.yml exec db psql -U ${POSTGRES_USER} -d postgres -c 'DROP DATABASE ${TARGET_DB};'"
+echo "    ${COMPOSE[*]} -f ${COMPOSE_FILE} exec db psql -U ${POSTGRES_USER} -d postgres -c 'DROP DATABASE ${TARGET_DB};'"

@@ -12,6 +12,7 @@ cd "$(dirname "$0")/.."
 
 BACKUP_DIR="${BACKUP_DIR:-./backups}"
 RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-14}"
+COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.yml}"
 TIMESTAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 
 if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
@@ -32,7 +33,7 @@ mkdir -p "$BACKUP_DIR"
 DUMP_FILE="$BACKUP_DIR/${POSTGRES_DB}_${TIMESTAMP}.dump"
 
 echo "==> dumping ${POSTGRES_DB} to ${DUMP_FILE}"
-"${COMPOSE[@]}" -f docker-compose.yml exec -T db \
+"${COMPOSE[@]}" -f "$COMPOSE_FILE" exec -T db \
   pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
   --format=custom --no-owner --no-acl > "$DUMP_FILE"
 

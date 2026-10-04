@@ -3,7 +3,7 @@ dist
 .next
 coverage
 pnpm-lock.yaml
-apps/api/drizzle/meta
+apps/api/drizzle
 docs
 prototypes
 PRD.md

@@ -17,5 +17,6 @@ dist/
 out/
 coverage/
 .pnpm-store/
+backups/
 *.tsbuildinfo
 next-env.d.ts

@@ -8,6 +8,10 @@
     "start": "node dist/main.js",
     "lint": "eslint src",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio",
     "test": "echo \"(ENG-00-18 adds the Jest + Supertest harness)\""
   },
   "dependencies": {
@@ -15,6 +19,8 @@
     "@nestjs/common": "^11.0.5",
     "@nestjs/core": "^11.0.5",
     "@nestjs/platform-express": "^11.0.5",
+    "drizzle-orm": "^0.45.3",
+    "pg": "^8.23.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1"
   },
@@ -23,6 +29,9 @@
     "@nestjs/schematics": "^11.0.0",
     "@types/express": "^5.0.0",
     "@types/node": "^22.10.7",
+    "@types/pg": "^8.23.1",
+    "dotenv": "^18.0.5",
+    "drizzle-kit": "^0.31.11",
     "typescript": "^5.7.3"
   }
 }
