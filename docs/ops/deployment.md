@@ -47,10 +47,11 @@ stored per center ([ENG-00 §3](../specs/ENG-00-architecture.md#3-tech-stack)).
 ## First deploy
 
 ```bash
-cp .env.example .env      # fill in real values
+cp .env.example .env      # fill in real values, including a strong POSTGRES_PASSWORD
 pnpm install              # host tooling (drizzle-kit, scripts)
 node scripts/compose.mjs -f docker-compose.yml up -d --build
-pnpm --filter @bookclass/api db:migrate   # apply migrations (drizzle-kit migrate)
+# apply migrations inside the api image (the db port is not published in production)
+node scripts/compose.mjs -f docker-compose.yml run --rm api node apps/api/dist/db/migrate.js
 ```
 
 Point Midtrans's webhook URL at `https://<DOMAIN>/api/webhooks/midtrans`. No tunnel is needed in
@@ -81,8 +82,9 @@ Run this on staging at least once, and repeat after any schema or Compose change
    `SELECT count(*) FROM refunds;` in the scratch database should be non-zero on a real center.
 5. **Clean up:** drop the scratch database with the command the script prints.
 
-**Status:** scripts are in the repository and exercised against the local Compose stack; the drill
-must still be executed once on staging before go-live (AC-5).
+**Status:** the drill was executed against the local Compose stack on 2026-10-04 — see
+[restore-drill.md](restore-drill.md) for the captured run. Repeat it once on staging before go-live
+(AC-5); staging does not exist yet in this repository's environments.
 
 ## Scaling story (if ever needed)
 

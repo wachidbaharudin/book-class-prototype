@@ -29,6 +29,12 @@ set -a; [ -f .env ] && . ./.env; set +a
 TARGET_DB="${2:-${POSTGRES_DB}_restore}"
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.yml}"
 
+# Safety guard: never drop the live database during a drill.
+if [ "$TARGET_DB" = "$POSTGRES_DB" ]; then
+  echo "error: refusing to restore over the live database '${POSTGRES_DB}'. Use a scratch target name." >&2
+  exit 1
+fi
+
 echo "==> recreating scratch database ${TARGET_DB}"
 "${COMPOSE[@]}" -f "$COMPOSE_FILE" exec -T db \
   psql -U "$POSTGRES_USER" -d postgres -v ON_ERROR_STOP=1 \

@@ -53,7 +53,7 @@ services:
     environment:
       NODE_ENV: production
       API_PORT: 4000
-      DATABASE_URL: postgresql://${POSTGRES_USER:-bookclass}:${POSTGRES_PASSWORD:-change-me}@db:5432/${POSTGRES_DB:-bookclass}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-bookclass}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in the deployment env}@db:5432/${POSTGRES_DB:-bookclass}
       APP_ENCRYPTION_KEY: ${APP_ENCRYPTION_KEY:?set APP_ENCRYPTION_KEY in the deployment env}
       MIDTRANS_IS_PRODUCTION: ${MIDTRANS_IS_PRODUCTION:-false}
       MIDTRANS_CLIENT_KEY: ${MIDTRANS_CLIENT_KEY:-}
@@ -70,7 +70,7 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-bookclass}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in the deployment env}
       POSTGRES_DB: ${POSTGRES_DB:-bookclass}
     volumes:
       - db-data:/var/lib/postgresql/data

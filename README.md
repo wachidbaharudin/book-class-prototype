@@ -95,7 +95,7 @@ pnpm --filter @bookclass/api db:migrate    # apply the baseline schema once the 
 ```
 
 - web → http://localhost:3001 · api → http://localhost:4000/api/v1
-- `pnpm dev:down` stops the stack; `pnpm db:backup` / `pnpm db:restore` exercise the ops drill.
+- `pnpm dev:down` stops the stack. Local ops drill: `COMPOSE_FILE=docker-compose.dev.yml pnpm db:backup`, then `COMPOSE_FILE=docker-compose.dev.yml pnpm db:restore <dump>`.
 - Production deploy, backup/restore runbook, and the scaling story: [docs/ops/deployment.md](docs/ops/deployment.md).
 
 ### Configuration & secrets
