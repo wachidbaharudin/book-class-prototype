@@ -35,6 +35,36 @@ test('booking input rejects a single-session series', () => {
   assert.equal(result.success, false);
 });
 
+test('booking input rejects a multi-session session booking', () => {
+  const result = CreateBookingInputSchema.safeParse({
+    studentProfileId: 1,
+    classId: 2,
+    bookingType: 'session',
+    sessionIds: [10, 11],
+  });
+  assert.equal(result.success, false);
+});
+
+test('booking input rejects duplicate session ids', () => {
+  const result = CreateBookingInputSchema.safeParse({
+    studentProfileId: 1,
+    classId: 2,
+    bookingType: 'series',
+    sessionIds: [10, 10],
+  });
+  assert.equal(result.success, false);
+});
+
+test('booking input accepts a valid single-session booking', () => {
+  const result = CreateBookingInputSchema.safeParse({
+    studentProfileId: 1,
+    classId: 2,
+    bookingType: 'session',
+    sessionIds: [10],
+  });
+  assert.equal(result.success, true);
+});
+
 test('error envelope shape is stable', () => {
   const parsed = ErrorEnvelopeSchema.parse({
     error: { code: 'NOT_FOUND', message: 'Class not found' },

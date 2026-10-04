@@ -33,9 +33,28 @@ export const CreateBookingInputSchema = z
     bookingType: BookingTypeSchema,
     sessionIds: z.array(IdSchema).min(1),
   })
-  .refine((value) => value.bookingType !== 'series' || value.sessionIds.length > 1, {
-    message: 'series bookings must include more than one session',
-    path: ['sessionIds'],
+  .superRefine((value, ctx) => {
+    if (new Set(value.sessionIds).size !== value.sessionIds.length) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'sessionIds must be unique',
+        path: ['sessionIds'],
+      });
+    }
+    if (value.bookingType === 'session' && value.sessionIds.length !== 1) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'session bookings must contain exactly one session',
+        path: ['sessionIds'],
+      });
+    }
+    if (value.bookingType === 'series' && value.sessionIds.length < 2) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'series bookings must include more than one session',
+        path: ['sessionIds'],
+      });
+    }
   });
 export type CreateBookingInput = z.infer<typeof CreateBookingInputSchema>;
 

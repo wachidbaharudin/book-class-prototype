@@ -9,9 +9,12 @@ const packageRoot = fileURLToPath(new URL('..', import.meta.url));
 const srcDir = join(packageRoot, 'src');
 
 const FORBIDDEN = [
-  { pattern: /(?:from|require\()\s*['"]@nestjs\//, label: '@nestjs/*' },
-  { pattern: /(?:from|require\()\s*['"]next(?:\/|['"])/, label: 'next' },
-  { pattern: /(?:from|require\()\s*['"]react(?:-dom)?(?:\/|['"])/, label: 'react / react-dom' },
+  { pattern: /(?:from|require\s*\(|import\s*\(?)\s*['"]@nestjs\//, label: '@nestjs/*' },
+  { pattern: /(?:from|require\s*\(|import\s*\(?)\s*['"]next(?:\/|['"])/, label: 'next' },
+  {
+    pattern: /(?:from|require\s*\(|import\s*\(?)\s*['"]react(?:-dom)?(?:\/|['"])/,
+    label: 'react / react-dom',
+  },
 ];
 
 function walk(dir) {
@@ -23,7 +26,7 @@ function walk(dir) {
 
 const violations = [];
 for (const file of walk(srcDir)) {
-  if (!file.endsWith('.ts')) continue;
+  if (!file.endsWith('.ts') && !file.endsWith('.tsx')) continue;
   const lines = readFileSync(file, 'utf8').split('\n');
   lines.forEach((line, index) => {
     for (const { pattern, label } of FORBIDDEN) {

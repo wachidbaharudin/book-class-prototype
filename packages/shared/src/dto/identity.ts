@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { UserRoleSchema, UserStatusSchema } from '../roles';
+import { CurrencySchema } from '../money';
 import { IdSchema, IsoUtcSchema } from './common';
 
 export const BRANCH_STATUSES = ['active', 'archived'] as const;
@@ -9,7 +10,7 @@ export type BranchStatus = z.infer<typeof BranchStatusSchema>;
 export const CenterSchema = z.object({
   id: IdSchema,
   name: z.string().min(1),
-  currency: z.string().length(3),
+  currency: CurrencySchema,
   isProduction: z.boolean(),
   createdAt: IsoUtcSchema,
 });
